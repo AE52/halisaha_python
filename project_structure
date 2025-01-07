@@ -1,0 +1,15 @@
+halısaha_app/
+├── app.py
+├── config.py
+├── models.py
+├── templates/
+│   ├── base.html
+│   ├── index.html
+│   ├── players.html
+│   ├── matches.html
+│   └── payments.html
+└── static/
+    ├── css/
+    │   └── style.css
+    └── js/
+        └── main.js 

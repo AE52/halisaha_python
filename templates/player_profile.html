@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="player-profile {{ get_player_card_class(player.overall) }}">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="player-info text-center">
+                    <h2>{{ player.name }}</h2>
+                    <div class="badge badge-primary">{{ player.position }}</div>
+                    <div class="overall-rating mt-3">
+                        <h1>{{ player.overall }}</h1>
+                        <small>GENEL DEĞER</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="player-stats">
+                    <div class="stat-card">
+                        <h4>Maç İstatistikleri</h4>
+                        <div>Toplam Maç: {{ stats.total_matches }}</div>
+                        <div>Galibiyet: {{ stats.wins }}</div>
+                        <div>Mağlubiyet: {{ stats.losses }}</div>
+                        <div>Kazanma Oranı: {{ "%.1f"|format(stats.win_rate) }}%</div>
+                    </div>
+                    <div class="stat-card">
+                        <h4>Oyuncu Değerleri</h4>
+                        <div>Hız: {{ player.pace }}</div>
+                        <div>Şut: {{ player.shooting }}</div>
+                        <div>Pas: {{ player.passing }}</div>
+                        <div>Dribling: {{ player.dribbling }}</div>
+                        <div>Defans: {{ player.defending }}</div>
+                        <div>Fizik: {{ player.physical }}</div>
+                    </div>
+                </div>
+                
+                <div class="win-rate-chart">
+                    <canvas id="winRateChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="match-history">
+            <h3>{{ translate('match_history') }}</h3>
+            {% for match in match_history %}
+            <div class="match-item">
+                <div class="match-date">
+                    {{ match.date.strftime('%d/%m/%Y') }}
+                </div>
+                <div class="match-details">
+                    {{ match.location }}
+                </div>
+                <div class="match-score">
+                    {{ match.score_team_a }} - {{ match.score_team_b }}
+                </div>
+                <div class="match-result {{ 'draw' if match.is_draw else 'win' if match.is_winner else 'loss' }}">
+                    {% if match.is_draw %}
+                        {{ translate('draw') }}
+                    {% else %}
+                        {{ translate('win') if match.is_winner else translate('loss') }}
+                    {% endif %}
+                </div>
+                <div class="payment-status">
+                    <i class="fas fa-{{ 'check text-success' if match.has_paid else 'times text-danger' }}"></i>
+                    {{ match.payment_amount }} TL
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="payment-history">
+            <h3>Ödeme Geçmişi</h3>
+            <div class="payment-summary">
+                <div class="stat-card">
+                    <h4>Ödeme Durumu</h4>
+                    <div>Toplam Borç: {{ "%.2f"|format(payment_stats.total_debt) }} TL</div>
+                    <div>Ödenen: {{ "%.2f"|format(payment_stats.total_paid) }} TL</div>
+                    <div>Kalan: {{ "%.2f"|format(payment_stats.remaining) }} TL</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Win Rate Chart
+const ctx = document.getElementById('winRateChart').getContext('2d');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: {{ chart_data.labels|tojson }},
+        datasets: [{
+            label: 'Kazanma Oranı',
+            data: {{ chart_data.win_rates|tojson }},
+            borderColor: '#2ecc71',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'top',
+            },
+            title: {
+                display: true,
+                text: 'Kazanma Oranı Değişimi'
+            }
+        }
+    }
+});
+</script>
+{% endblock %} 

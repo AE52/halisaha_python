@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row mt-5">
+        <div class="col-12">
+            <h1 class="text-center mb-5">{{ translate('welcome') }}</h1>
+            <p class="text-center lead mb-5">{{ translate('welcome_message') }}</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="feature-card">
+                <h3><i class="fas fa-users"></i> {{ translate('players') }}</h3>
+                <p>{{ translate('players_description') }}</p>
+                <a href="{{ url_for('players') }}" class="btn btn-outline-primary">
+                    {{ translate('view_players') }}
+                </a>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="feature-card">
+                <h3><i class="fas fa-trophy"></i> {{ translate('matches') }}</h3>
+                <p>{{ translate('matches_description') }}</p>
+                <a href="{{ url_for('matches') }}" class="btn btn-outline-primary">
+                    {{ translate('view_matches') }}
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

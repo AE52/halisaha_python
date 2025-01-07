@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="{{ session.get('lang', 'tr') }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Halısaha Takip Sistemi</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://unpkg.com/framer-motion/dist/framer-motion.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flag-icon-css/3.5.0/css/flag-icon.min.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-gradient-primary fixed-top">
+        <div class="container">
+            <!-- Sol taraf: Logo ve Saat -->
+            <div class="d-flex align-items-center">
+                <a class="navbar-brand" href="{{ url_for('index') }}">
+                    <i class="fas fa-futbol"></i> Halısaha Takip
+                </a>
+                <div class="datetime-display d-none d-lg-block ml-3">
+                    <div id="current-time" class="small"></div>
+                    <div id="current-date" class="small"></div>
+                </div>
+            </div>
+
+            <!-- Mobil menü butonu -->
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContent">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <!-- Menü içeriği -->
+            <div class="collapse navbar-collapse" id="navbarContent">
+                <!-- Orta: Ana menü -->
+                <ul class="navbar-nav mx-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('players') }}">
+                            <i class="fas fa-users"></i> {{ translate('players') }}
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('matches') }}">
+                            <i class="fas fa-trophy"></i> {{ translate('matches') }}
+                        </a>
+                    </li>
+                    <li class="nav-item admin-only" style="display: none;">
+                        <a class="nav-link" href="{{ url_for('new_match') }}">
+                            <i class="fas fa-plus-circle"></i> {{ translate('new_match') }}
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- Sağ: Admin ve Dil seçenekleri -->
+                <ul class="navbar-nav">
+                    <!-- Dil Seçimi -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" data-toggle="dropdown">
+                            <span class="flag-icon flag-icon-{{ 'tr' if session.get('lang') == 'tr' else 'gb' }}"></span>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-right">
+                            <a class="dropdown-item" href="{{ url_for('set_language', lang='tr') }}">
+                                <span class="flag-icon flag-icon-tr"></span> Türkçe
+                            </a>
+                            <a class="dropdown-item" href="{{ url_for('set_language', lang='en') }}">
+                                <span class="flag-icon flag-icon-gb"></span> English
+                            </a>
+                        </div>
+                    </li>
+                    
+                    <!-- Admin Butonları -->
+                    <li class="nav-item" id="adminButtons">
+                        <a class="nav-link" href="{{ url_for('login') }}">
+                            <i class="fas fa-lock"></i> {{ translate('admin_login') }}
+                        </a>
+                    </li>
+                    
+                    <!-- Admin Menüsü -->
+                    <li class="nav-item dropdown admin-menu" style="display: none;">
+                        <a class="nav-link dropdown-toggle" href="#" data-toggle="dropdown">
+                            <i class="fas fa-cog"></i> Admin
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-right">
+                            <a class="dropdown-item" href="{{ url_for('new_match') }}">
+                                <i class="fas fa-plus-circle"></i> {{ translate('new_match') }}
+                            </a>
+                            <a class="dropdown-item" href="{{ url_for('players') }}">
+                                <i class="fas fa-users"></i> {{ translate('players') }}
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" href="#" onclick="handleLogout()">
+                                <i class="fas fa-sign-out-alt"></i> {{ translate('logout') }}
+                            </a>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Navbar'ın altındaki boşluk için -->
+    <div style="margin-top: 76px;"></div>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-info">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4">
+                    <h5>{{ translate('about') }}</h5>
+                    <p>Halısaha Takip Sistemi, maç organizasyonlarınızı kolaylaştırmak için tasarlanmıştır.</p>
+                </div>
+                <div class="col-md-4">
+                    <h5>{{ translate('contact') }}</h5>
+                    <p>
+                        <i class="fas fa-envelope"></i> info@halisaha.com<br>
+                        <i class="fas fa-phone"></i> +90 555 123 4567
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <h5>{{ translate('social_media') }}</h5>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // Saat ve tarih güncelleme
+        function updateDateTime() {
+            const now = new Date();
+            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+            const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('tr-TR', timeOptions);
+            document.getElementById('current-date').textContent = now.toLocaleDateString('tr-TR', dateOptions);
+        }
+        
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+    </script>
+</body>
+</html> 

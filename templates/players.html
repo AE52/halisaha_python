@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <!-- Admin paneli -->
+    <div class="col-md-4 admin-only" style="display: none;">
+        <div class="card">
+            <div class="card-header bg-gradient-primary text-white">
+                <h5><i class="fas fa-user-plus"></i> {{ translate('add_player') }}</h5>
+            </div>
+            <div class="card-body">
+                <form id="addPlayerForm" onsubmit="handleAddPlayer(event)">
+                    <div class="form-group">
+                        <label for="name">İsim</label>
+                        <input type="text" class="form-control" id="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="position">Pozisyon</label>
+                        <select class="form-control" id="position">
+                            <option value="Kaleci">Kaleci</option>
+                            <option value="Defans">Defans</option>
+                            <option value="Orta Saha">Orta Saha</option>
+                            <option value="Forvet">Forvet</option>
+                        </select>
+                    </div>
+                    <div class="stats-section">
+                        <h6 class="mb-3">Oyuncu Statları</h6>
+                        <div class="form-group">
+                            <label for="pace">Hız (Pace)</label>
+                            <input type="range" class="custom-range" id="pace" min="1" max="99" value="70" oninput="updateStatValue(this)">
+                            <span id="pace_value">70</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="shooting">Şut (Shooting)</label>
+                            <input type="range" class="custom-range" id="shooting" min="1" max="99" value="70" oninput="updateStatValue(this)">
+                            <span id="shooting_value">70</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="passing">Pas (Passing)</label>
+                            <input type="range" class="custom-range" id="passing" min="1" max="99" value="70" oninput="updateStatValue(this)">
+                            <span id="passing_value">70</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="dribbling">Dribling</label>
+                            <input type="range" class="custom-range" id="dribbling" min="1" max="99" value="70" oninput="updateStatValue(this)">
+                            <span id="dribbling_value">70</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="defending">Defans</label>
+                            <input type="range" class="custom-range" id="defending" min="1" max="99" value="70" oninput="updateStatValue(this)">
+                            <span id="defending_value">70</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="physical">Fizik</label>
+                            <input type="range" class="custom-range" id="physical" min="1" max="99" value="70" oninput="updateStatValue(this)">
+                            <span id="physical_value">70</span>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Oyuncu Ekle
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Oyuncu listesi -->
+    <div class="col-md-8">
+        <h3 class="mb-4"><i class="fas fa-users"></i> {{ translate('players') }}</h3>
+        <div class="row">
+            {% for player in players %}
+            <div class="col-md-6 mb-3">
+                <div class="card player-card {{ get_player_card_class(player.overall) }}">
+                    <a href="{{ url_for('player_profile', id=player.id) }}" class="text-white text-decoration-none">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="card-title">{{ player.name }}</h5>
+                                <span class="badge badge-light">{{ player.overall }} OVR</span>
+                            </div>
+                            <p class="card-text">
+                                <span class="badge badge-info">{{ player.position }}</span>
+                            </p>
+                            <div class="stats-grid">
+                                <div class="stat-item">
+                                    <small>PAC</small>
+                                    <span class="stat-value {{ 'high' if player.pace >= 85 else 'medium' if player.pace >= 75 else 'low' }}">
+                                        {{ player.pace }}
+                                    </span>
+                                </div>
+                                <div class="stat-item">
+                                    <small>SHO</small>
+                                    <span class="stat-value {{ 'high' if player.shooting >= 85 else 'medium' if player.shooting >= 75 else 'low' }}">
+                                        {{ player.shooting }}
+                                    </span>
+                                </div>
+                                <div class="stat-item">
+                                    <small>PAS</small>
+                                    <span class="stat-value {{ 'high' if player.passing >= 85 else 'medium' if player.passing >= 75 else 'low' }}">
+                                        {{ player.passing }}
+                                    </span>
+                                </div>
+                                <div class="stat-item">
+                                    <small>DRI</small>
+                                    <span class="stat-value {{ 'high' if player.dribbling >= 85 else 'medium' if player.dribbling >= 75 else 'low' }}">
+                                        {{ player.dribbling }}
+                                    </span>
+                                </div>
+                                <div class="stat-item">
+                                    <small>DEF</small>
+                                    <span class="stat-value {{ 'high' if player.defending >= 85 else 'medium' if player.defending >= 75 else 'low' }}">
+                                        {{ player.defending }}
+                                    </span>
+                                </div>
+                                <div class="stat-item">
+                                    <small>PHY</small>
+                                    <span class="stat-value {{ 'high' if player.physical >= 85 else 'medium' if player.physical >= 75 else 'low' }}">
+                                        {{ player.physical }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="mt-3 text-right admin-only" style="display: none;" onclick="event.stopPropagation()">
+                                <button class="btn btn-sm btn-warning" onclick="editPlayer({{ player.id }}, event)">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="deletePlayer({{ player.id }}, event)">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Düzenleme Modal -->
+<div class="modal fade" id="editPlayerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Oyuncu Düzenle</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editPlayerForm" onsubmit="handleEditPlayer(event)">
+                    <input type="hidden" id="edit_player_id">
+                    <div class="mb-3">
+                        <label for="edit_name" class="form-label">İsim</label>
+                        <input type="text" class="form-control" id="edit_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_position" class="form-label">Pozisyon</label>
+                        <select class="form-control" id="edit_position" required>
+                            <option value="Kaleci">Kaleci</option>
+                            <option value="Defans">Defans</option>
+                            <option value="Orta Saha">Orta Saha</option>
+                            <option value="Forvet">Forvet</option>
+                        </select>
+                    </div>
+                    <div class="stat-sliders">
+                        <div class="mb-3">
+                            <label for="edit_pace" class="form-label">
+                                Hız: <span id="edit_pace_value">70</span>
+                            </label>
+                            <input type="range" class="form-range" id="edit_pace" 
+                                   min="1" max="99" value="70" oninput="updateStatValue(this)">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_shooting" class="form-label">
+                                Şut: <span id="edit_shooting_value">70</span>
+                            </label>
+                            <input type="range" class="form-range" id="edit_shooting" 
+                                   min="1" max="99" value="70" oninput="updateStatValue(this)">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_passing" class="form-label">
+                                Pas: <span id="edit_passing_value">70</span>
+                            </label>
+                            <input type="range" class="form-range" id="edit_passing" 
+                                   min="1" max="99" value="70" oninput="updateStatValue(this)">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_dribbling" class="form-label">
+                                Dribling: <span id="edit_dribbling_value">70</span>
+                            </label>
+                            <input type="range" class="form-range" id="edit_dribbling" 
+                                   min="1" max="99" value="70" oninput="updateStatValue(this)">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_defending" class="form-label">
+                                Defans: <span id="edit_defending_value">70</span>
+                            </label>
+                            <input type="range" class="form-range" id="edit_defending" 
+                                   min="1" max="99" value="70" oninput="updateStatValue(this)">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_physical" class="form-label">
+                                Fizik: <span id="edit_physical_value">70</span>
+                            </label>
+                            <input type="range" class="form-range" id="edit_physical" 
+                                   min="1" max="99" value="70" oninput="updateStatValue(this)">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

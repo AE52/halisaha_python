@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3><i class="fas fa-trophy"></i> Maç Listesi</h3>
+            <a href="/new-match" class="btn btn-primary admin-only">
+                <i class="fas fa-plus"></i> Yeni Maç
+            </a>
+        </div>
+
+        <!-- Gelecek Maçlar -->
+        <h4 class="mb-3">Yaklaşan Maçlar</h4>
+        {% for match in matches if match.date >= now %}
+        <div class="card match-card mb-3">
+            <div class="card-body">
+                <form class="match-form" onsubmit="handleMatchUpdate(event, {{ match.id }})">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <div class="form-group">
+                                <label><i class="fas fa-calendar"></i> Tarih</label>
+                                <input type="datetime-local" class="form-control" name="date" 
+                                       value="{{ match.date.strftime('%Y-%m-%dT%H:%M') }}" required>
+                            </div>
+                            <div class="form-group mt-2">
+                                <label><i class="fas fa-map-marker-alt"></i> Konum</label>
+                                <input type="text" class="form-control" name="location" 
+                                       value="{{ match.location }}" required>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="score-section text-center">
+                                <label>Skor</label>
+                                <div class="d-flex justify-content-center align-items-center gap-2">
+                                    <input type="number" class="form-control score-input" name="score_team_a" 
+                                           value="{{ match.score_team_a if match.score_team_a != None }}" min="0">
+                                    <span class="score-divider">-</span>
+                                    <input type="number" class="form-control score-input" name="score_team_b" 
+                                           value="{{ match.score_team_b if match.score_team_b != None }}" min="0">
+                                </div>
+                            </div>
+                            {% if match.is_upcoming %}
+                            <div class="match-timer text-center mt-2" id="timer-{{ match.id }}">
+                                Kalan Süre: Yükleniyor...
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="form-group">
+                                <label><i class="fas fa-money-bill"></i> Toplam Ücret</label>
+                                <input type="number" class="form-control" name="total_cost" 
+                                       value="{{ match.total_cost }}" required>
+                            </div>
+                            <p class="text-center mt-2">
+                                Kişi Başı: {{ "%.2f"|format(match.total_cost / match.match_players|length if match.match_players else 0) }} TL
+                            </p>
+                        </div>
+                    </div>
+                    <div class="text-center mt-3">
+                        <button type="submit" class="btn btn-success btn-sm admin-only">
+                            <i class="fas fa-save"></i> Kaydet
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm admin-only" onclick="deleteMatch({{ match.id }})">
+                            <i class="fas fa-trash"></i> Sil
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Geçmiş Maçlar -->
+        <h4 class="mb-3 mt-5">Geçmiş Maçlar</h4>
+        {% for match in matches if match.date < now %}
+        <div class="card match-card mb-3" onclick="window.location.href='/matches/{{ match.id }}'">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <h5 class="mb-2"><i class="fas fa-calendar"></i> {{ match.date.strftime('%d/%m/%Y %H:%M') }}</h5>
+                        <p class="mb-2"><i class="fas fa-map-marker-alt"></i> {{ match.location }}</p>
+                    </div>
+                    <div class="col-12 col-md-4 text-center">
+                        {% if match.score_team_a is not none and match.score_team_b is not none %}
+                            <h4 class="mb-2">{{ match.score_team_a }} - {{ match.score_team_b }}</h4>
+                            <div class="badge badge-info">Maç Tamamlandı</div>
+                        {% else %}
+                            <h4 class="mb-2">Skor Belirlenmedi</h4>
+                            <div class="badge badge-warning">Sonuç Girilmedi</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-12 col-md-4 text-md-right text-center">
+                        <h5 class="mb-2">{{ match.total_cost }} TL</h5>
+                        <p>Kişi Başı: {{ "%.2f"|format(match.total_cost / match.match_players|length if match.match_players else 0) }} TL</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
