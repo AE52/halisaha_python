@@ -1073,26 +1073,12 @@ function initDatePicker(elementId) {
         enableTime: true,
         dateFormat: "d.m.Y H:i",
         time_24hr: true,
-        minDate: "today",
         defaultDate: new Date(),
         minuteIncrement: 30,
         position: "auto",
         theme: "dark",
         disableMobile: "true",
-        wrap: true, // Input group için gerekli
-        onChange: function(selectedDates, dateStr, instance) {
-            if (selectedDates[0]) {
-                const now = new Date();
-                if (selectedDates[0] < now) {
-                    instance.setDate(now);
-                    Swal.fire({
-                        icon: 'warning',
-                        title: translate('warning'),
-                        text: translate('past_date_warning')
-                    });
-                }
-            }
-        }
+        wrap: true
     });
 
     // Varsayılan tarihi ayarla
@@ -1110,4 +1096,54 @@ document.addEventListener('DOMContentLoaded', function() {
     if (datePicker) {
         initDatePicker('#date');
     }
-}); 
+});
+
+async function markAllAsPaid(matchId) {
+    if (!requireAdmin()) return;
+
+    try {
+        const result = await Swal.fire({
+            title: translate('confirm'),
+            text: translate('confirm_mark_all_paid'),
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: translate('confirm'),
+            cancelButtonText: translate('cancel')
+        });
+
+        if (result.isConfirmed) {
+            const response = await fetch(`/api/matches/${matchId}/mark-all-paid`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: translate('success'),
+                    text: data.message,
+                    showConfirmButton: false,
+                    timer: 1500
+                }).then(() => {
+                    window.location.reload();
+                });
+            } else {
+                throw new Error(data.message || translate('error_occurred'));
+            }
+        }
+    } catch (error) {
+        console.error('Ödeme güncelleme hatası:', error);
+        Swal.fire({
+            icon: 'error',
+            title: translate('error'),
+            text: translate('payment_update_error')
+        });
+    }
+} 

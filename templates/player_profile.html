@@ -10,21 +10,21 @@
                     <div class="badge badge-primary">{{ player.position }}</div>
                     <div class="overall-rating mt-3">
                         <h1>{{ player.overall }}</h1>
-                        <small>GENEL DEĞER</small>
+                        <small>{{ translate('overall_rating') }}</small>
                     </div>
                 </div>
             </div>
             <div class="col-md-8">
                 <div class="player-stats">
                     <div class="stat-card">
-                        <h4>Maç İstatistikleri</h4>
+                        <h4>{{ translate('player_stats') }}</h4>
                         <div>Toplam Maç: {{ stats.total_matches }}</div>
                         <div>Galibiyet: {{ stats.wins }}</div>
                         <div>Mağlubiyet: {{ stats.losses }}</div>
                         <div>Kazanma Oranı: {{ "%.1f"|format(stats.win_rate) }}%</div>
                     </div>
                     <div class="stat-card">
-                        <h4>Oyuncu Değerleri</h4>
+                        <h4>{{ translate('player_values') }}</h4>
                         <div>Hız: {{ player.pace }}</div>
                         <div>Şut: {{ player.shooting }}</div>
                         <div>Pas: {{ player.passing }}</div>
@@ -43,7 +43,7 @@
         <div class="match-history">
             <h3>{{ translate('match_history') }}</h3>
             {% for match in match_history %}
-            <div class="match-item">
+            <div class="match-item" onclick="window.location.href='/matches/{{ match.match_id }}'" style="cursor: pointer;">
                 <div class="match-date">
                     {{ match.date.strftime('%d/%m/%Y') }}
                 </div>
@@ -72,7 +72,7 @@
             <h3>Ödeme Geçmişi</h3>
             <div class="payment-summary">
                 <div class="stat-card">
-                    <h4>Ödeme Durumu</h4>
+                    <h4>{{ translate('payment_status') }}</h4>
                     <div>Toplam Borç: {{ "%.2f"|format(payment_stats.total_debt) }} TL</div>
                     <div>Ödenen: {{ "%.2f"|format(payment_stats.total_paid) }} TL</div>
                     <div>Kalan: {{ "%.2f"|format(payment_stats.remaining) }} TL</div>
@@ -105,7 +105,7 @@ new Chart(ctx, {
             },
             title: {
                 display: true,
-                text: 'Kazanma Oranı Değişimi'
+                text: translate('win_rate_change')
             }
         }
     }

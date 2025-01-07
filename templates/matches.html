@@ -4,14 +4,14 @@
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h3><i class="fas fa-trophy"></i> Maç Listesi</h3>
+            <h3><i class="fas fa-trophy"></i> {{ translate('matchlist') }}</h3>
             <a href="/new-match" class="btn btn-primary admin-only">
-                <i class="fas fa-plus"></i> Yeni Maç
+                <i class="fas fa-plus"></i> {{ translate('new_match') }}
             </a>
         </div>
 
         <!-- Gelecek Maçlar -->
-        <h4 class="mb-3">Yaklaşan Maçlar</h4>
+        <h4 class="mb-3">{{ translate('upcomingmatches') }}</h4>
         {% for match in matches if match.date >= now %}
         <div class="card match-card mb-3">
             <div class="card-body">
@@ -31,7 +31,7 @@
                         </div>
                         <div class="col-12 col-md-4">
                             <div class="score-section text-center">
-                                <label>Skor</label>
+                                <label>{{ translate('score_label') }}</label>
                                 <div class="d-flex justify-content-center align-items-center gap-2">
                                     <input type="number" class="form-control score-input" name="score_team_a" 
                                            value="{{ match.score_team_a if match.score_team_a != None }}" min="0">
@@ -53,7 +53,7 @@
                                        value="{{ match.total_cost }}" required>
                             </div>
                             <p class="text-center mt-2">
-                                Kişi Başı: {{ "%.2f"|format(match.total_cost / match.match_players|length if match.match_players else 0) }} TL
+                                {{ translate('per_person_cost', amount="%.2f"|format(match.total_cost / match.match_players|length if match.match_players else 0)) }}
                             </p>
                         </div>
                     </div>
@@ -61,7 +61,12 @@
                         <button type="submit" class="btn btn-success btn-sm admin-only">
                             <i class="fas fa-save"></i> Kaydet
                         </button>
-                        <button type="button" class="btn btn-danger btn-sm admin-only" onclick="deleteMatch({{ match.id }})">
+                        <button type="button" class="btn btn-warning btn-sm admin-only" 
+                                onclick="markAllAsPaid({{ match.id }})">
+                            <i class="fas fa-money-bill"></i> Tüm Ödemeleri Tamamla
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm admin-only" 
+                                onclick="deleteMatch({{ match.id }})">
                             <i class="fas fa-trash"></i> Sil
                         </button>
                     </div>
@@ -71,7 +76,7 @@
         {% endfor %}
 
         <!-- Geçmiş Maçlar -->
-        <h4 class="mb-3 mt-5">Geçmiş Maçlar</h4>
+        <h4 class="mb-3 mt-5">{{ translate('pastmatches') }}</h4>
         {% for match in matches if match.date < now %}
         <div class="card match-card mb-3" onclick="window.location.href='/matches/{{ match.id }}'">
             <div class="card-body">
@@ -83,10 +88,10 @@
                     <div class="col-12 col-md-4 text-center">
                         {% if match.score_team_a is not none and match.score_team_b is not none %}
                             <h4 class="mb-2">{{ match.score_team_a }} - {{ match.score_team_b }}</h4>
-                            <div class="badge badge-info">Maç Tamamlandı</div>
+                            <div class="badge badge-info">{{ translate('match_completed') }}</div>
                         {% else %}
-                            <h4 class="mb-2">Skor Belirlenmedi</h4>
-                            <div class="badge badge-warning">Sonuç Girilmedi</div>
+                            <h4 class="mb-2">{{ translate('score_not_set') }}</h4>
+                            <div class="badge badge-warning">{{ translate('result_not_entered') }}</div>
                         {% endif %}
                     </div>
                     <div class="col-12 col-md-4 text-md-right text-center">
@@ -97,6 +102,12 @@
             </div>
         </div>
         {% endfor %}
+
+        {% if not matches %}
+        <div class="alert alert-info">
+            {{ translate('no_matches') }}
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

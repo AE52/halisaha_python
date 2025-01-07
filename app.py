@@ -184,7 +184,7 @@ def add_match_api():
             total_cost=float(data['total_cost'])
         )
         db.session.add(match)
-        db.session.flush()  # ID'yi almak için flush yapıyoruz
+        db.session.flush()
         
         # Toplam oyuncu sayısı
         total_players = len(data['team_a']) + len(data['team_b'])
@@ -197,7 +197,7 @@ def add_match_api():
                 player_id=player_id,
                 team='A',
                 payment_amount=per_player_cost,
-                has_paid=False  # Varsayılan olarak ödenmemiş
+                has_paid=False
             )
             db.session.add(mp)
         
@@ -208,16 +208,23 @@ def add_match_api():
                 player_id=player_id,
                 team='B',
                 payment_amount=per_player_cost,
-                has_paid=False  # Varsayılan olarak ödenmemiş
+                has_paid=False
             )
             db.session.add(mp)
         
         db.session.commit()
-        return jsonify({"message": "Maç başarıyla oluşturuldu", "match_id": match.id})
+        return jsonify({
+            "success": True,
+            "message": get_translation('match_created'),
+            "match_id": match.id
+        })
     
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": str(e)}), 400
+        return jsonify({
+            "success": False,
+            "message": f"{get_translation('error')}: {str(e)}"
+        }), 400
 
 @app.route('/api/matches/<int:id>', methods=['PUT'])
 @admin_required
@@ -409,9 +416,15 @@ def new_match():
     now = now.replace(second=0, microsecond=0)
     return render_template('new_match.html', all_players=all_players, now=now)
 
-def get_translation(key):
-    lang = session.get('lang', 'tr')
-    return translations[lang].get(key, key)
+def get_translation(key, **kwargs):
+    text = translations['tr'].get(key, key)  # Direkt Türkçe çevirileri al
+    
+    if kwargs:
+        try:
+            return text.format(**kwargs)
+        except (KeyError, ValueError):
+            return text
+    return text
 
 @app.context_processor
 def utility_processor():
@@ -443,13 +456,13 @@ def player_profile(id):
     match_players = MatchPlayer.query.filter_by(player_id=id).all()
     total_matches = len(match_players)
     wins = 0
-    draws = 0  # Beraberlikler için yeni değişken
+    draws = 0
     match_history = []
     
     for mp in match_players:
         match = Match.query.get(mp.match_id)
         is_winner = False
-        is_draw = False  # Beraberlik kontrolü için
+        is_draw = False
         
         if match.score_team_a is not None and match.score_team_b is not None:
             if match.score_team_a == match.score_team_b:
@@ -465,12 +478,13 @@ def player_profile(id):
                     wins += 1
         
         match_history.append({
+            'match_id': match.id,
             'date': match.date,
             'location': match.location,
             'score_team_a': match.score_team_a,
             'score_team_b': match.score_team_b,
             'is_winner': is_winner,
-            'is_draw': is_draw,  # Beraberlik bilgisini ekle
+            'is_draw': is_draw,
             'has_paid': mp.has_paid,
             'payment_amount': mp.payment_amount
         })
@@ -479,8 +493,8 @@ def player_profile(id):
     stats = {
         'total_matches': total_matches,
         'wins': wins,
-        'draws': draws,  # Beraberlikleri ekle
-        'losses': total_matches - wins - draws,  # Mağlubiyetleri düzelt
+        'draws': draws,
+        'losses': total_matches - wins - draws,
         'win_rate': (wins / total_matches * 100) if total_matches > 0 else 0
     }
     
@@ -526,6 +540,34 @@ def format_date(date, lang='tr'):
 @app.template_filter('format_date')
 def format_date_filter(date):
     return format_date(date, session.get('lang', 'tr'))
+
+@app.route('/api/matches/<int:match_id>/mark-all-paid', methods=['POST'])
+@admin_required
+def mark_all_paid(match_id):
+    try:
+        # Maça ait tüm oyuncuların ödeme durumunu güncelle
+        match_players = MatchPlayer.query.filter_by(match_id=match_id).all()
+        
+        for mp in match_players:
+            mp.has_paid = True
+        
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": get_translation('all_payments_completed')
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"{get_translation('error')}: {str(e)}"
+        }), 500
+
+# Dil ayarları için varsayılan Türkçe
+@app.before_request
+def before_request():
+    session['lang'] = 'tr'  # Her zaman Türkçe olacak
 
 if __name__ == '__main__':
     app.run(debug=True) 

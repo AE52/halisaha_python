@@ -56,21 +56,6 @@
 
                 <!-- Sağ: Admin ve Dil seçenekleri -->
                 <ul class="navbar-nav">
-                    <!-- Dil Seçimi -->
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" data-toggle="dropdown">
-                            <span class="flag-icon flag-icon-{{ 'tr' if session.get('lang') == 'tr' else 'gb' }}"></span>
-                        </a>
-                        <div class="dropdown-menu dropdown-menu-right">
-                            <a class="dropdown-item" href="{{ url_for('set_language', lang='tr') }}">
-                                <span class="flag-icon flag-icon-tr"></span> Türkçe
-                            </a>
-                            <a class="dropdown-item" href="{{ url_for('set_language', lang='en') }}">
-                                <span class="flag-icon flag-icon-gb"></span> English
-                            </a>
-                        </div>
-                    </li>
-                    
                     <!-- Admin Butonları -->
                     <li class="nav-item" id="adminButtons">
                         <a class="nav-link" href="{{ url_for('login') }}">
@@ -127,8 +112,8 @@
                 <div class="col-md-4">
                     <h5>{{ translate('contact') }}</h5>
                     <p>
-                        <i class="fas fa-envelope"></i> info@halisaha.com<br>
-                        <i class="fas fa-phone"></i> +90 555 123 4567
+                        <i class="fas fa-envelope"></i> asimerenozdemir@gmail.com<br>
+                        <i class="fas fa-phone"></i> +90 545 130 5234
                     </p>
                 </div>
                 <div class="col-md-4">

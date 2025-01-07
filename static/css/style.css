@@ -582,6 +582,13 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    transition: all 0.3s ease;
+}
+
+.match-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .match-result.draw {
@@ -730,11 +737,12 @@ body {
     transition: all 0.3s ease;
     background: rgba(0, 0, 0, 0.3);
     backdrop-filter: blur(10px);
+    cursor: pointer;
 }
 
 .match-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .match-form .form-control {

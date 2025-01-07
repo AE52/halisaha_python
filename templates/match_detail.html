@@ -66,10 +66,10 @@
             </div>
             <div class="col-12 col-md-4">
                 <div class="cost-display text-center">
-                    <h4>Toplam Ücret</h4>
-                    <div class="cost-amount">{{ match.total_cost }} TL</div>
+                    <h4>{{ translate('total_cost') }}</h4>
+                    <div class="cost-amount">{{ translate('total_amount', amount=match.total_cost) }}</div>
                     <div class="per-person-cost">
-                        Kişi Başı: {{ "%.2f"|format(match.total_cost / match.match_players|length if match.match_players else 0) }} TL
+                        {{ translate('per_person_cost', amount="%.2f"|format(match.total_cost / match.match_players|length if match.match_players else 0)) }}
                     </div>
                 </div>
             </div>
