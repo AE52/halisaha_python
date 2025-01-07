@@ -24,15 +24,14 @@ COPY requirements.txt .
 # Python paketlerini yükle
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Uygulama kodlarını kopyala
+# SQLite veritabanı için dizin oluştur
+RUN mkdir -p /app/instance
+
+# Önce veritabanı dosyasını kopyala
+COPY instance/halisaha.db /app/instance/
+
+# Sonra uygulama kodlarını kopyala
 COPY . .
-
-# SQLite veritabanı için dizin oluştur ve izinleri ayarla
-RUN mkdir -p /app/instance \
-    && chmod 777 /app/instance
-
-# Veritabanını başlat
-RUN python init_db.py
 
 # Güvenlik için root olmayan kullanıcıya geç
 RUN useradd -m appuser && chown -R appuser:appuser /app
