@@ -81,6 +81,99 @@
                 </div>
             </div>
         </div>
+
+        <!-- TC No (sadece admin görebilir) -->
+        {% if is_admin %}
+        <div class="admin-section mt-3">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5>{{ translate('admin_info') }}</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>{{ translate('tc_no') }}:</strong> 
+                        {% if player.tc_no %}
+                            {{ player.tc_no }}
+                        {% else %}
+                            <span class="text-muted">{{ translate('tc_not_set') }}</span>
+                        {% endif %}
+                    </p>
+                    <button class="btn btn-warning" onclick="editPlayerTC({{ player.id }})">
+                        <i class="fas fa-edit"></i> {{ translate('edit_tc') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Yorumlar ve Beğeniler Bölümü -->
+        <div class="comments-section mt-4">
+            <h3>{{ translate('comments') }}</h3>
+            {% if is_logged_in or is_admin %}
+                <form onsubmit="addComment(event)">
+                    <div class="form-group">
+                        <textarea class="form-control" id="comment" rows="3" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        {{ translate('add_comment') }}
+                    </button>
+                </form>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> 
+                    {{ translate('login_required_for_comment') }}
+                    <a href="{{ url_for('player_login') }}">{{ translate('login') }}</a>
+                </div>
+            {% endif %}
+            
+            <!-- Yorum listesi -->
+            <div class="comments-list mt-3">
+                {% for comment in player.comments_received %}
+                <div class="comment-item">
+                    {% if comment.is_admin_comment %}
+                        <strong class="admin-comment">
+                            <i class="fas fa-shield-alt"></i> Admin
+                        </strong>
+                    {% else %}
+                        <strong>{{ comment.commenter.name }}</strong>
+                    {% endif %}
+                    <p>{{ comment.comment }}</p>
+                    <small>{{ comment.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="likes-section mt-4">
+            <h4>{{ translate('likes_dislikes') }}</h4>
+            <div class="likes-container">
+                <div class="likes-stats">
+                    <div class="like-percentage">
+                        {% set total_reactions = player.likes_received.count() %}
+                        {% set likes = player.likes_received.filter_by(is_like=true).count() %}
+                        {% set dislikes = player.likes_received.filter_by(is_like=false).count() %}
+                        {% set like_percent = (likes / total_reactions * 100) if total_reactions > 0 else 0 %}
+                        {% set dislike_percent = (dislikes / total_reactions * 100) if total_reactions > 0 else 0 %}
+                        
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="like-btn {% if has_liked == true %}active{% endif %}" 
+                                 onclick="toggleReaction(true)">
+                                <i class="fas fa-thumbs-up"></i>
+                                <span>%{{ "%.0f"|format(like_percent) }}</span>
+                            </div>
+                            <div class="progress flex-grow-1 mx-2">
+                                <div class="progress-bar bg-success" style="width: {{ like_percent }}%"></div>
+                            </div>
+                            <div class="dislike-btn {% if has_liked == false %}active{% endif %}"
+                                 onclick="toggleReaction(false)">
+                                <i class="fas fa-thumbs-down"></i>
+                                <span>%{{ "%.0f"|format(dislike_percent) }}</span>
+                            </div>
+                        </div>
+                        <small class="text-muted">{{ total_reactions }} {{ translate('total_reactions') }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -305,6 +398,102 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .player-special .match-item:hover {
     border-left-color: #ff4d4d;
+}
+
+.likes-section {
+    margin: 20px 0;
+}
+
+.btn-like {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 24px;
+    padding: 5px 10px;
+    transition: all 0.3s ease;
+}
+
+.btn-like:not([disabled]):hover {
+    color: #ff4d4d;
+    transform: scale(1.1);
+}
+
+.btn-like.liked {
+    color: #ff4d4d;
+}
+
+.btn-like[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.likes-section span {
+    font-size: 18px;
+    color: #666;
+}
+
+.likes-container {
+    background: rgba(0,0,0,0.2);
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.likes-stats {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.like-percentage {
+    text-align: center;
+}
+
+.progress {
+    height: 10px;
+    background: rgba(255,255,255,0.1);
+}
+
+.like-btn, .dislike-btn {
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+    color: #aaa;
+}
+
+.like-btn:hover {
+    color: #2ecc71;
+}
+
+.dislike-btn:hover {
+    color: #e74c3c;
+}
+
+.like-btn.active {
+    color: #2ecc71;
+}
+
+.dislike-btn.active {
+    color: #e74c3c;
+}
+
+.like-btn i, .dislike-btn i {
+    font-size: 24px;
+    margin-right: 5px;
+}
+
+.admin-comment {
+    color: #e74c3c;
+}
+
+.admin-comment i {
+    margin-right: 5px;
+}
+
+.comment-item {
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    background: rgba(255,255,255,0.05);
 }
 </style>
 {% endblock %} 

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory
-from models import db, Player, Match, MatchPlayer, API_KEY
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory, make_response
+from models import db, Player, Match, MatchPlayer, API_KEY, PlayerComment, PlayerLike
 from config import Config
 from functools import wraps
 from translations import translations
@@ -10,7 +10,7 @@ app = Flask(__name__)
 app.config.from_object(Config)
 db.init_app(app)
 
-# JWT decorator'ı
+# Decorator'ları en başa alalım
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -50,6 +50,51 @@ def admin_required(f):
             
     return decorated_function
 
+def player_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.cookies.get('player_jwt')
+        
+        if not token:
+            flash(get_translation('login_required'), 'error')
+            return redirect(url_for('player_login'))
+
+        try:
+            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
+            if 'player_id' not in data:
+                raise jwt.InvalidTokenError
+                
+            # Session'ı güncelle
+            session['player_id'] = data['player_id']
+            return f(*args, **kwargs)
+            
+        except jwt.ExpiredSignatureError:
+            flash(get_translation('session_expired'), 'error')
+            return redirect(url_for('player_login'))
+        except jwt.InvalidTokenError:
+            flash(get_translation('invalid_session'), 'error')
+            return redirect(url_for('player_login'))
+            
+    return decorated_function
+
+# Yardımcı fonksiyonlar
+def get_translation(key, **kwargs):
+    text = translations['tr'].get(key, key)
+    if kwargs:
+        try:
+            return text.format(**kwargs)
+        except (KeyError, ValueError):
+            return text
+    return text
+
+@app.context_processor
+def utility_processor():
+    return dict(translate=get_translation)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -72,24 +117,38 @@ def login():
     
     return render_template('login.html')
 
-
 @app.route('/api/players', methods=['POST'])
 @admin_required
 def add_player_api():
     data = request.json
-    player = Player(
-        name=data['name'],
-        position=data['position'],
-        pace=data['pace'],
-        shooting=data['shooting'],
-        passing=data['passing'],
-        dribbling=data['dribbling'],
-        defending=data['defending'],
-        physical=data['physical']
-    )
-    db.session.add(player)
-    db.session.commit()
-    return jsonify({"msg": "Oyuncu başarıyla eklendi"})
+    try:
+        # TC No kontrolü
+        if 'tc_no' in data:
+            existing_player = Player.query.filter_by(tc_no=data['tc_no']).first()
+            if existing_player:
+                return jsonify({
+                    "success": False,
+                    "message": get_translation('tc_exists')
+                }), 400
+
+        player = Player(
+            name=data['name'],
+            tc_no=data.get('tc_no'),  # Opsiyonel TC No
+            position=data['position'],
+            overall=data['overall'],
+            pace=data['pace'],
+            shooting=data['shooting'],
+            passing=data['passing'],
+            dribbling=data['dribbling'],
+            defending=data['defending'],
+            physical=data['physical']
+        )
+        db.session.add(player)
+        db.session.commit()
+        return jsonify({"success": True, "message": get_translation('player_added')})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 400
 
 @app.route('/api/players/<int:id>', methods=['PUT'])
 @admin_required
@@ -97,49 +156,31 @@ def update_player_api(id):
     try:
         player = Player.query.get_or_404(id)
         data = request.json
-        
-        # Gelen verileri kontrol et ve güncelle
-        if 'name' in data:
-            player.name = data['name']
-        if 'position' in data:
-            player.position = data['position']
-        if 'pace' in data:
-            player.pace = int(data['pace'])
-        if 'shooting' in data:
-            player.shooting = int(data['shooting'])
-        if 'passing' in data:
-            player.passing = int(data['passing'])
-        if 'dribbling' in data:
-            player.dribbling = int(data['dribbling'])
-        if 'defending' in data:
-            player.defending = int(data['defending'])
-        if 'physical' in data:
-            player.physical = int(data['physical'])
-        
-        db.session.commit()
-        
+
+        if 'tc_no' in data:
+            # TC No kontrolü
+            if data['tc_no'] != player.tc_no:
+                existing = Player.query.filter_by(tc_no=data['tc_no']).first()
+                if existing:
+                    return jsonify({
+                        'success': False,
+                        'message': get_translation('tc_exists')
+                    }), 400
+
+            player.tc_no = data['tc_no']
+            db.session.commit()
+
         return jsonify({
-            "success": True,
-            "message": "Oyuncu başarıyla güncellendi",
-            "player": {
-                "id": player.id,
-                "name": player.name,
-                "position": player.position,
-                "pace": player.pace,
-                "shooting": player.shooting,
-                "passing": player.passing,
-                "dribbling": player.dribbling,
-                "defending": player.defending,
-                "physical": player.physical,
-                "overall": player.overall
-            }
+            'success': True,
+            'message': get_translation('tc_updated')
         })
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
-            "success": False,
-            "message": "Güncelleme sırasında bir hata oluştu: " + str(e)
-        }), 500
+            'success': False,
+            'message': str(e)
+        }), 400
 
 @app.route('/api/players/<int:id>', methods=['DELETE'])
 @admin_required
@@ -148,11 +189,6 @@ def delete_player_api(id):
     player.is_active = False
     db.session.commit()
     return jsonify({"msg": "Oyuncu başarıyla silindi"})
-
-# Görüntüleme işlemleri için JWT gerekmez
-@app.route('/')
-def index():
-    return render_template('index.html')
 
 @app.route('/players')
 def players():
@@ -291,18 +327,20 @@ def get_match_api(id):
 @app.route('/api/players/<int:id>', methods=['GET'])
 @admin_required
 def get_player_api(id):
-    player = Player.query.get_or_404(id)
-    return jsonify({
-        'id': player.id,
-        'name': player.name,
-        'position': player.position,
-        'pace': player.pace,
-        'shooting': player.shooting,
-        'passing': player.passing,
-        'dribbling': player.dribbling,
-        'defending': player.defending,
-        'physical': player.physical
-    })
+    try:
+        player = Player.query.get_or_404(id)
+        return jsonify({
+            'success': True,
+            'id': player.id,
+            'name': player.name,
+            'tc_no': player.tc_no,
+            'position': player.position
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 400
 
 @app.route('/api/matches/<int:id>/teams', methods=['POST'])
 @admin_required
@@ -416,20 +454,6 @@ def new_match():
     now = now.replace(second=0, microsecond=0)
     return render_template('new_match.html', all_players=all_players, now=now)
 
-def get_translation(key, **kwargs):
-    text = translations['tr'].get(key, key)  # Direkt Türkçe çevirileri al
-    
-    if kwargs:
-        try:
-            return text.format(**kwargs)
-        except (KeyError, ValueError):
-            return text
-    return text
-
-@app.context_processor
-def utility_processor():
-    return dict(translate=get_translation)
-
 @app.route('/set-language/<lang>')
 def set_language(lang):
     if lang in ['tr', 'en']:
@@ -525,12 +549,36 @@ def player_profile(id):
             chart_data['labels'].append(match.date.strftime('%d/%m'))
             chart_data['win_rates'].append(round(win_count / i * 100, 1))
     
+    # Admin kontrolü
+    is_admin = False
+    admin_token = request.cookies.get('jwt_token')
+    if admin_token:
+        try:
+            jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
+            is_admin = True
+        except:
+            pass
+
+    # Oyuncu girişi kontrolü
+    is_logged_in = 'player_id' in session
+    
+    # Giriş yapmış kullanıcı bu oyuncuyu beğenmiş mi?
+    has_liked = False
+    if 'player_id' in session:
+        has_liked = PlayerLike.query.filter_by(
+            player_id=id,
+            liker_id=session['player_id']
+        ).first() is not None
+    
     return render_template('player_profile.html',
                          player=player,
                          stats=stats,
                          match_history=match_history,
                          payment_stats=payment_stats,
-                         chart_data=chart_data)
+                         chart_data=chart_data,
+                         is_admin=is_admin,
+                         is_logged_in=is_logged_in,
+                         has_liked=has_liked)
 
 def format_date(date, lang='tr'):
     if lang == 'tr':
@@ -572,6 +620,154 @@ def before_request():
 @app.route('/static/sounds/<path:filename>')
 def serve_sound(filename):
     return send_from_directory('static/sounds', filename)
+
+@app.route('/player-login', methods=['GET', 'POST'])
+def player_login():
+    if request.method == 'POST':
+        tc_no = request.form.get('tc_no')
+        player = Player.query.filter_by(tc_no=tc_no).first()
+        
+        if player:
+            # JWT token oluştur
+            token = jwt.encode({
+                'player_id': player.id,
+                'exp': datetime.utcnow() + timedelta(days=30)  # 30 gün geçerli
+            }, app.config['SECRET_KEY'])
+            
+            # Session'a player_id'yi kaydet
+            session['player_id'] = player.id
+            
+            # Response oluştur ve cookie ekle
+            response = make_response(redirect(url_for('player_profile', id=player.id)))
+            response.set_cookie('player_jwt', token, httponly=True, secure=True)
+            
+            return response
+        else:
+            flash(get_translation('invalid_tc'), 'error')
+            return redirect(url_for('player_login'))
+    
+    return render_template('player_login.html')
+
+@app.route('/player-logout')
+def player_logout():
+    session.pop('player_id', None)
+    response = make_response(redirect(url_for('index')))
+    response.delete_cookie('player_jwt')
+    return response
+
+@app.route('/api/comments/<int:player_id>', methods=['POST'])
+def add_comment(player_id):
+    # Admin kontrolü
+    is_admin = False
+    admin_token = request.cookies.get('jwt_token')
+    if admin_token:
+        try:
+            jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
+            is_admin = True
+        except:
+            pass
+
+    # Normal oyuncu kontrolü
+    if not is_admin and 'player_id' not in session:
+        return jsonify({"error": get_translation('login_required_for_comment')}), 401
+    
+    try:
+        # Yorum yapan kişinin ID'si (admin veya oyuncu)
+        commenter_id = None
+        if is_admin:
+            commenter_id = -1  # Admin için özel ID
+        else:
+            commenter_id = session['player_id']
+        
+        comment_text = request.json.get('comment')
+        if not comment_text:
+            return jsonify({"error": "Yorum boş olamaz"}), 400
+        
+        comment = PlayerComment(
+            player_id=player_id,
+            commenter_id=commenter_id,
+            comment=comment_text,
+            is_admin_comment=is_admin
+        )
+        db.session.add(comment)
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "message": "Yorum başarıyla eklendi"
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/likes/<int:player_id>', methods=['POST'])
+def toggle_reaction(player_id):
+    # Admin kontrolü
+    is_admin = False
+    admin_token = request.cookies.get('jwt_token')
+    if admin_token:
+        try:
+            jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
+            is_admin = True
+        except:
+            pass
+
+    # Normal oyuncu kontrolü
+    if not is_admin and 'player_id' not in session:
+        return jsonify({"error": get_translation('login_required_for_reaction')}), 401
+    
+    try:
+        # Beğenen kişinin ID'si (admin veya oyuncu)
+        liker_id = -1 if is_admin else session['player_id']
+        is_like = request.json.get('is_like', True)
+        
+        existing_reaction = PlayerLike.query.filter_by(
+            player_id=player_id,
+            liker_id=liker_id,
+            is_admin_reaction=is_admin
+        ).first()
+        
+        if existing_reaction:
+            if existing_reaction.is_like == is_like:
+                db.session.delete(existing_reaction)
+            else:
+                existing_reaction.is_like = is_like
+        else:
+            reaction = PlayerLike(
+                player_id=player_id,
+                liker_id=liker_id,
+                is_like=is_like,
+                is_admin_reaction=is_admin
+            )
+            db.session.add(reaction)
+        
+        db.session.commit()
+        
+        # İstatistikleri hesapla
+        total_reactions = PlayerLike.query.filter_by(player_id=player_id).count()
+        likes = PlayerLike.query.filter_by(player_id=player_id, is_like=True).count()
+        dislikes = PlayerLike.query.filter_by(player_id=player_id, is_like=False).count()
+        
+        like_percent = (likes / total_reactions * 100) if total_reactions > 0 else 0
+        dislike_percent = (dislikes / total_reactions * 100) if total_reactions > 0 else 0
+        
+        return jsonify({
+            "success": True,
+            "like_percent": like_percent,
+            "dislike_percent": dislike_percent,
+            "total_reactions": total_reactions
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=True) 

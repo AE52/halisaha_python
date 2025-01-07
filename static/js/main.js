@@ -1183,4 +1183,198 @@ document.addEventListener('DOMContentLoaded', function() {
             playClickSound();
         });
     });
-}); 
+});
+
+async function addComment(event) {
+    event.preventDefault();
+    const comment = document.getElementById('comment').value;
+    const playerId = window.location.pathname.split('/').pop();
+    
+    try {
+        const response = await fetch(`/api/comments/${playerId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ comment })
+        });
+        
+        if (response.ok) {
+            window.location.reload();
+        }
+    } catch (error) {
+        console.error('Yorum eklenirken hata:', error);
+    }
+}
+
+async function toggleLike() {
+    const playerId = window.location.pathname.split('/').pop();
+    const likeButton = document.querySelector('.btn-like');
+    const likeCount = likeButton.nextElementSibling;
+    
+    try {
+        const response = await fetch(`/api/likes/${playerId}`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            likeButton.classList.toggle('liked');
+            likeCount.textContent = result.likes_count;
+            
+            // Konfeti efekti
+            if (likeButton.classList.contains('liked')) {
+                confetti({
+                    particleCount: 50,
+                    spread: 30,
+                    origin: { y: 0.8 }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Beğeni işlemi sırasında hata:', error);
+        Swal.fire({
+            icon: 'error',
+            title: translate('error'),
+            text: translate('like_error')
+        });
+    }
+}
+
+async function editPlayerTC(playerId) {
+    try {
+        const response = await fetch(`/api/players/${playerId}`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Oyuncu bilgileri alınamadı');
+        }
+
+        const player = await response.json();
+        
+        const { value: tc_no } = await Swal.fire({
+            title: translate('edit_tc'),
+            input: 'text',
+            inputLabel: translate('tc_no'),
+            inputValue: player.tc_no || '',
+            inputAttributes: {
+                maxlength: '11',
+                pattern: '\\d{11}'
+            },
+            showCancelButton: true,
+            confirmButtonText: translate('save'),
+            cancelButtonText: translate('cancel'),
+            inputValidator: (value) => {
+                if (!value) {
+                    return translate('tc_required');
+                }
+                if (!/^\d{11}$/.test(value)) {
+                    return translate('tc_invalid');
+                }
+            }
+        });
+
+        if (tc_no) {
+            const updateResponse = await fetch(`/api/players/${playerId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`
+                },
+                body: JSON.stringify({ tc_no })
+            });
+
+            if (!updateResponse.ok) {
+                throw new Error(await updateResponse.text());
+            }
+
+            const result = await updateResponse.json();
+            
+            if (result.success) {
+                await Swal.fire({
+                    icon: 'success',
+                    title: translate('success'),
+                    text: translate('tc_updated'),
+                    timer: 1500
+                });
+                window.location.reload();
+            } else {
+                throw new Error(result.message);
+            }
+        }
+    } catch (error) {
+        console.error('TC güncelleme hatası:', error);
+        await Swal.fire({
+            icon: 'error',
+            title: translate('error'),
+            text: error.message
+        });
+    }
+}
+
+async function toggleReaction(isLike) {
+    if (!isLoggedIn && !isAdmin) {
+        Swal.fire({
+            title: translate('login_required'),
+            text: translate('login_required_for_reaction'),
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: translate('login'),
+            cancelButtonText: translate('cancel')
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = '/player-login';
+            }
+        });
+        return;
+    }
+
+    const playerId = window.location.pathname.split('/').pop();
+    
+    try {
+        const response = await fetch(`/api/likes/${playerId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // Admin token'ı varsa ekle
+                ...(isAdmin && {'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`})
+            },
+            body: JSON.stringify({ is_like: isLike })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            // Yüzdeleri güncelle
+            const likePercent = result.like_percent;
+            const dislikePercent = result.dislike_percent;
+            
+            // Progress bar'ı güncelle
+            document.querySelector('.progress-bar').style.width = `${likePercent}%`;
+            
+            // Yüzde metinlerini güncelle
+            document.querySelector('.like-btn span').textContent = `%${Math.round(likePercent)}`;
+            document.querySelector('.dislike-btn span').textContent = `%${Math.round(dislikePercent)}`;
+            
+            // Aktif butonları güncelle
+            document.querySelector('.like-btn').classList.toggle('active', isLike);
+            document.querySelector('.dislike-btn').classList.toggle('active', !isLike);
+            
+            // Toplam reaksiyon sayısını güncelle
+            document.querySelector('.text-muted').textContent = 
+                `${result.total_reactions} ${translate('total_reactions')}`;
+        } else {
+            throw new Error(await response.text());
+        }
+    } catch (error) {
+        console.error('Reaksiyon hatası:', error);
+        Swal.fire({
+            icon: 'error',
+            title: translate('error'),
+            text: translate('reaction_error')
+        });
+    }
+} 

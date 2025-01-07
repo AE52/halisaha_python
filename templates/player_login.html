@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>{{ translate('player_login') }}</h4>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category if category != 'message' else 'info' }}">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                    
+                    <form method="POST">
+                        <div class="form-group">
+                            <label>{{ translate('tc_no') }}</label>
+                            <input type="text" class="form-control" name="tc_no" 
+                                   required maxlength="11" pattern="\d{11}"
+                                   placeholder="12345678901">
+                            <small class="form-text text-muted">
+                                {{ translate('tc_help_text') }}
+                            </small>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">
+                            {{ translate('login') }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

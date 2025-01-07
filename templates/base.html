@@ -15,28 +15,17 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-gradient-primary fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <!-- Sol taraf: Logo ve Saat -->
-            <div class="d-flex align-items-center">
-                <a class="navbar-brand" href="{{ url_for('index') }}">
-                    <i class="fas fa-futbol"></i> Halısaha Takip
-                </a>
-                <div class="datetime-display d-none d-lg-block ml-3">
-                    <div id="current-time" class="small"></div>
-                    <div id="current-date" class="small"></div>
-                </div>
-            </div>
-
-            <!-- Mobil menü butonu -->
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContent">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-futbol"></i> Halısaha
+            </a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             
-            <!-- Menü içeriği -->
-            <div class="collapse navbar-collapse" id="navbarContent">
-                <!-- Orta: Ana menü -->
-                <ul class="navbar-nav mx-auto">
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav mr-auto">
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('players') }}">
                             <i class="fas fa-users"></i> {{ translate('players') }}
@@ -47,39 +36,39 @@
                             <i class="fas fa-trophy"></i> {{ translate('matches') }}
                         </a>
                     </li>
-                    <li class="nav-item admin-only" style="display: none;">
-                        <a class="nav-link" href="{{ url_for('new_match') }}">
-                            <i class="fas fa-plus-circle"></i> {{ translate('new_match') }}
-                        </a>
-                    </li>
                 </ul>
+                
+                <ul class="navbar-nav ml-auto">
+                    <!-- Oyuncu Girişi/Profil -->
+                    {% if session.get('player_id') %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="playerDropdown" role="button" 
+                               data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="fas fa-user"></i> {{ translate('my_profile') }}
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="playerDropdown">
+                                <a class="dropdown-item" href="{{ url_for('player_profile', id=session.get('player_id')) }}">
+                                    <i class="fas fa-id-card"></i> {{ translate('profile') }}
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item" href="{{ url_for('player_logout') }}">
+                                    <i class="fas fa-sign-out-alt"></i> {{ translate('logout') }}
+                                </a>
+                            </div>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('player_login') }}">
+                                <i class="fas fa-sign-in-alt"></i> {{ translate('player_login') }}
+                            </a>
+                        </li>
+                    {% endif %}
 
-                <!-- Sağ: Admin ve Dil seçenekleri -->
-                <ul class="navbar-nav">
-                    <!-- Admin Butonları -->
-                    <li class="nav-item" id="adminButtons">
-                        <a class="nav-link" href="{{ url_for('login') }}">
+                    <!-- Admin Girişi -->
+                    <li class="nav-item">
+                        <a class="nav-link admin-login-btn" href="#" onclick="showLoginModal()">
                             <i class="fas fa-lock"></i> {{ translate('admin_login') }}
                         </a>
-                    </li>
-                    
-                    <!-- Admin Menüsü -->
-                    <li class="nav-item dropdown admin-menu" style="display: none;">
-                        <a class="nav-link dropdown-toggle" href="#" data-toggle="dropdown">
-                            <i class="fas fa-cog"></i> Admin
-                        </a>
-                        <div class="dropdown-menu dropdown-menu-right">
-                            <a class="dropdown-item" href="{{ url_for('new_match') }}">
-                                <i class="fas fa-plus-circle"></i> {{ translate('new_match') }}
-                            </a>
-                            <a class="dropdown-item" href="{{ url_for('players') }}">
-                                <i class="fas fa-users"></i> {{ translate('players') }}
-                            </a>
-                            <div class="dropdown-divider"></div>
-                            <a class="dropdown-item" href="#" onclick="handleLogout()">
-                                <i class="fas fa-sign-out-alt"></i> {{ translate('logout') }}
-                            </a>
-                        </div>
                     </li>
                 </ul>
             </div>
@@ -128,6 +117,31 @@
         </div>
     </footer>
 
+    <script>
+        // Çeviri fonksiyonu
+        function translate(key) {
+            const translations = {
+                'edit_tc': 'TC No Düzenle',
+                'tc_no': 'T.C. Kimlik No',
+                'tc_required': 'T.C. Kimlik No zorunludur',
+                'tc_invalid': 'Geçersiz T.C. Kimlik No',
+                'save': 'Kaydet',
+                'cancel': 'İptal',
+                'success': 'Başarılı',
+                'error': 'Hata',
+                'tc_updated': 'TC No güncellendi',
+                'login_required': 'Giriş Gerekli',
+                'login_required_for_reaction': 'Beğeni/beğenmeme için giriş yapmalısınız',
+                'login': 'Giriş Yap'
+            };
+            return translations[key] || key;
+        }
+
+        // isLoggedIn ve isAdmin değişkenlerini tanımla
+        const isLoggedIn = {{ 'true' if session.get('player_id') else 'false' }};
+        const isAdmin = {{ 'true' if request.cookies.get('jwt_token') else 'false' }};
+    </script>
+
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
@@ -138,18 +152,24 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/tr.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script>
-        // Saat ve tarih güncelleme
         function updateDateTime() {
-            const now = new Date();
-            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
-            const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const timeElement = document.getElementById('current-time');
+            const dateElement = document.getElementById('current-date');
             
-            document.getElementById('current-time').textContent = now.toLocaleTimeString('tr-TR', timeOptions);
-            document.getElementById('current-date').textContent = now.toLocaleDateString('tr-TR', dateOptions);
+            if (timeElement && dateElement) {  // Elementlerin varlığını kontrol et
+                const now = new Date();
+                const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+                const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                
+                timeElement.textContent = now.toLocaleTimeString('tr-TR', timeOptions);
+                dateElement.textContent = now.toLocaleDateString('tr-TR', dateOptions);
+            }
         }
-        
-        setInterval(updateDateTime, 1000);
-        updateDateTime();
+
+        if (document.getElementById('current-time')) {  // Sadece element varsa interval'i başlat
+            setInterval(updateDateTime, 1000);
+            updateDateTime();
+        }
     </script>
 </body>
 </html> 

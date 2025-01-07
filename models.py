@@ -6,19 +6,49 @@ db = SQLAlchemy()
 # User modelini kaldırıyoruz ve yerine basit bir API_KEY tanımlıyoruz
 API_KEY = "AE52YAPAR"
 
+class PlayerComment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'))
+    commenter_id = db.Column(db.Integer, db.ForeignKey('player.id'))
+    comment = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    likes = db.Column(db.Integer, default=0)
+    is_admin_comment = db.Column(db.Boolean, default=False)
+
+class PlayerLike(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'))
+    liker_id = db.Column(db.Integer, db.ForeignKey('player.id'))
+    is_like = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_admin_reaction = db.Column(db.Boolean, default=False)
+
 class Player(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    tc_no = db.Column(db.String(11), unique=True, nullable=True)
     position = db.Column(db.String(50))
+    pace = db.Column(db.Integer, default=70)
+    shooting = db.Column(db.Integer, default=70)
+    passing = db.Column(db.Integer, default=70)
+    dribbling = db.Column(db.Integer, default=70)
+    defending = db.Column(db.Integer, default=70)
+    physical = db.Column(db.Integer, default=70)
     is_active = db.Column(db.Boolean, default=True)
     
-    # FIFA tarzı statlar
-    pace = db.Column(db.Integer, default=70)  # Hız
-    shooting = db.Column(db.Integer, default=70)  # Şut
-    passing = db.Column(db.Integer, default=70)  # Pas
-    dribbling = db.Column(db.Integer, default=70)  # Dribling
-    defending = db.Column(db.Integer, default=70)  # Defans
-    physical = db.Column(db.Integer, default=70)  # Fizik
+    # İlişkiler
+    comments_received = db.relationship('PlayerComment',
+                                      foreign_keys='PlayerComment.player_id',
+                                      backref='player', lazy='dynamic')
+    comments_made = db.relationship('PlayerComment',
+                                  foreign_keys='PlayerComment.commenter_id',
+                                  backref='commenter', lazy='dynamic')
+    likes_received = db.relationship('PlayerLike',
+                                   foreign_keys='PlayerLike.player_id',
+                                   backref='player', lazy='dynamic')
+    likes_given = db.relationship('PlayerLike',
+                                foreign_keys='PlayerLike.liker_id',
+                                backref='liker', lazy='dynamic')
     
     @property
     def overall(self):

@@ -23,6 +23,12 @@
                             <option value="Forvet">Forvet</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label for="tc_no">{{ translate('tc_no') }}</label>
+                        <input type="text" class="form-control" id="tc_no" name="tc_no" 
+                               maxlength="11" pattern="\d{11}" 
+                               title="{{ translate('tc_invalid') }}">
+                    </div>
                     <div class="stats-section">
                         <h6 class="mb-3">Oyuncu Statları</h6>
                         <div class="form-group">
@@ -136,75 +142,29 @@
     </div>
 </div>
 
-<!-- Düzenleme Modal -->
+<!-- Oyuncu düzenleme modalı -->
 <div class="modal fade" id="editPlayerModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Oyuncu Düzenle</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title">{{ translate('edit_player') }}</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
             </div>
             <div class="modal-body">
-                <form id="editPlayerForm" onsubmit="handleEditPlayer(event)">
+                <form id="editPlayerForm">
                     <input type="hidden" id="edit_player_id">
-                    <div class="mb-3">
-                        <label for="edit_name" class="form-label">İsim</label>
+                    <div class="form-group">
+                        <label>{{ translate('player_name') }}</label>
                         <input type="text" class="form-control" id="edit_name" required>
                     </div>
-                    <div class="mb-3">
-                        <label for="edit_position" class="form-label">Pozisyon</label>
-                        <select class="form-control" id="edit_position" required>
-                            <option value="Kaleci">Kaleci</option>
-                            <option value="Defans">Defans</option>
-                            <option value="Orta Saha">Orta Saha</option>
-                            <option value="Forvet">Forvet</option>
-                        </select>
+                    <div class="form-group">
+                        <label>{{ translate('tc_no') }}</label>
+                        <input type="text" class="form-control" id="edit_tc_no" 
+                               maxlength="11" pattern="\d{11}">
                     </div>
-                    <div class="stat-sliders">
-                        <div class="mb-3">
-                            <label for="edit_pace" class="form-label">
-                                Hız: <span id="edit_pace_value">70</span>
-                            </label>
-                            <input type="range" class="form-range" id="edit_pace" 
-                                   min="1" max="99" value="70" oninput="updateStatValue(this)">
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_shooting" class="form-label">
-                                Şut: <span id="edit_shooting_value">70</span>
-                            </label>
-                            <input type="range" class="form-range" id="edit_shooting" 
-                                   min="1" max="99" value="70" oninput="updateStatValue(this)">
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_passing" class="form-label">
-                                Pas: <span id="edit_passing_value">70</span>
-                            </label>
-                            <input type="range" class="form-range" id="edit_passing" 
-                                   min="1" max="99" value="70" oninput="updateStatValue(this)">
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_dribbling" class="form-label">
-                                Dribling: <span id="edit_dribbling_value">70</span>
-                            </label>
-                            <input type="range" class="form-range" id="edit_dribbling" 
-                                   min="1" max="99" value="70" oninput="updateStatValue(this)">
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_defending" class="form-label">
-                                Defans: <span id="edit_defending_value">70</span>
-                            </label>
-                            <input type="range" class="form-range" id="edit_defending" 
-                                   min="1" max="99" value="70" oninput="updateStatValue(this)">
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_physical" class="form-label">
-                                Fizik: <span id="edit_physical_value">70</span>
-                            </label>
-                            <input type="range" class="form-range" id="edit_physical" 
-                                   min="1" max="99" value="70" oninput="updateStatValue(this)">
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                    <!-- ... diğer alanlar ... -->
                 </form>
             </div>
         </div>
