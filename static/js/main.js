@@ -282,6 +282,10 @@ async function handleAddMatch(event) {
     event.preventDefault();
     if (!requireAdmin()) return;
 
+    const dateInput = document.getElementById('date');
+    const locationInput = document.getElementById('location');
+    const totalCostInput = document.getElementById('total_cost');
+
     // Takımları kontrol et
     const teamA = getTeamPlayers('team-a');
     const teamB = getTeamPlayers('team-b');
@@ -290,15 +294,19 @@ async function handleAddMatch(event) {
         Swal.fire({
             icon: 'error',
             title: 'Hata!',
-            text: 'Her iki takım için de oyuncu seçmelisiniz!'
+            text: 'Her iki takımda da en az bir oyuncu olmalıdır!'
         });
         return;
     }
 
+    // Tarihi doğru formata çevir
+    const selectedDate = new Date(dateInput.value);
+    const formattedDate = `${selectedDate.getDate()}/${selectedDate.getMonth() + 1}/${selectedDate.getFullYear()} ${selectedDate.getHours()}:${selectedDate.getMinutes()}`;
+
     const data = {
-        date: document.getElementById('date').value,
-        location: document.getElementById('location').value,
-        total_cost: document.getElementById('total_cost').value,
+        date: formattedDate,
+        location: locationInput.value,
+        total_cost: parseFloat(totalCostInput.value),
         team_a: teamA,
         team_b: teamB
     };
@@ -327,6 +335,7 @@ async function handleAddMatch(event) {
             throw new Error('Maç oluşturulamadı');
         }
     } catch (error) {
+        console.error('Maç oluşturma hatası:', error);
         Swal.fire({
             icon: 'error',
             title: 'Hata!',
@@ -1055,4 +1064,50 @@ function updateStatValue(input) {
     if (valueDisplay) {
         valueDisplay.textContent = value;
     }
-} 
+}
+
+// Tarih seçici ayarları
+function initDatePicker(elementId) {
+    const fp = flatpickr(elementId, {
+        locale: 'tr',
+        enableTime: true,
+        dateFormat: "d.m.Y H:i",
+        time_24hr: true,
+        minDate: "today",
+        defaultDate: new Date(),
+        minuteIncrement: 30,
+        position: "auto",
+        theme: "dark",
+        disableMobile: "true",
+        wrap: true, // Input group için gerekli
+        onChange: function(selectedDates, dateStr, instance) {
+            if (selectedDates[0]) {
+                const now = new Date();
+                if (selectedDates[0] < now) {
+                    instance.setDate(now);
+                    Swal.fire({
+                        icon: 'warning',
+                        title: translate('warning'),
+                        text: translate('past_date_warning')
+                    });
+                }
+            }
+        }
+    });
+
+    // Varsayılan tarihi ayarla
+    const now = new Date();
+    const roundedMinutes = Math.ceil(now.getMinutes() / 30) * 30;
+    now.setMinutes(roundedMinutes);
+    fp.setDate(now);
+
+    return fp;
+}
+
+// Sayfa yüklendiğinde
+document.addEventListener('DOMContentLoaded', function() {
+    const datePicker = document.getElementById('date');
+    if (datePicker) {
+        initDatePicker('#date');
+    }
+}); 

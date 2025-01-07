@@ -72,7 +72,7 @@ def login():
     
     return render_template('login.html')
 
-# API rotaları için admin_required decorator'ını kullanıyoruz
+
 @app.route('/api/players', methods=['POST'])
 @admin_required
 def add_player_api():
@@ -174,7 +174,10 @@ def matches():
 def add_match_api():
     data = request.json
     try:
-        match_date = datetime.strptime(data['date'], '%Y-%m-%dT%H:%M')
+        # Tarihi parse et
+        date_str = data['date']
+        match_date = datetime.strptime(date_str, '%d/%m/%Y %H:%M')
+        
         match = Match(
             date=match_date,
             location=data['location'],
@@ -399,7 +402,12 @@ def match_detail(id):
 @admin_required
 def new_match():
     all_players = Player.query.filter_by(is_active=True).all()
-    return render_template('new_match.html', all_players=all_players)
+    now = datetime.now()
+    # Dakikayı 30'un katlarına yuvarlama
+    if now.minute % 30:
+        now = now + timedelta(minutes=30 - now.minute % 30)
+    now = now.replace(second=0, microsecond=0)
+    return render_template('new_match.html', all_players=all_players, now=now)
 
 def get_translation(key):
     lang = session.get('lang', 'tr')

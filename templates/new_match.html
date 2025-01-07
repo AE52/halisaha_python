@@ -12,19 +12,27 @@
                     <div class="col-md-4">
                         <div class="form-group">
                             <label for="date">{{ translate('date') }}</label>
-                            <input type="datetime-local" class="form-control" id="date" required>
+                            <input type="datetime-local" 
+                                   class="form-control" 
+                                   id="date" 
+                                   name="date"
+                                   min="{{ now.strftime('%Y-%m-%dT%H:%M') }}"
+                                   value="{{ now.strftime('%Y-%m-%dT%H:%M') }}"
+                                   required>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="form-group">
                             <label for="location">{{ translate('location') }}</label>
-                            <input type="text" class="form-control" id="location" required>
+                            <input type="text" class="form-control" id="location" 
+                                   placeholder="{{ translate('select_location') }}" required>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="form-group">
                             <label for="total_cost">{{ translate('total_cost') }}</label>
-                            <input type="number" class="form-control" id="total_cost" required>
+                            <input type="number" class="form-control" id="total_cost" 
+                                   placeholder="{{ translate('enter_cost') }}" required>
                         </div>
                     </div>
                 </div>
@@ -38,8 +46,8 @@
                         <div class="center-circle"></div>
                         <div class="penalty-area-left"></div>
                         <div class="penalty-area-right"></div>
-                        <div class="team-indicator team-a-indicator">A TAKIMI →</div>
-                        <div class="team-indicator team-b-indicator">← B TAKIMI</div>
+                        <div class="team-indicator team-a-indicator">← {{ translate('team_a') }}</div>
+                        <div class="team-indicator team-b-indicator">{{ translate('team_b') }} →</div>
                         
                         <!-- A Takımı Alanı -->
                         <div class="team-area team-a-area" id="team-a">
@@ -84,4 +92,51 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Türkçe dil desteğini etkinleştir
+    flatpickr.localize(flatpickr.l10ns.tr);
+    
+    // Tarih seçiciyi başlat
+    const datePicker = flatpickr("#date", {
+        enableTime: true,
+        dateFormat: "d.m.Y H:i",
+        time_24hr: true,
+        minDate: "today",
+        defaultDate: new Date(),
+        minuteIncrement: 30,
+        clickOpens: true,
+        allowInput: true,
+        theme: "dark",
+        appendTo: document.querySelector('.input-group'),
+        onChange: function(selectedDates, dateStr, instance) {
+            if (selectedDates[0]) {
+                const now = new Date();
+                if (selectedDates[0] < now) {
+                    instance.setDate(now);
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Uyarı!',
+                        text: 'Geçmiş bir tarih seçemezsiniz!'
+                    });
+                }
+            }
+        }
+    });
+
+    // İkona tıklandığında takvimi aç
+    document.querySelector('.input-group-append').addEventListener('click', function() {
+        datePicker.open();
+    });
+
+    // Varsayılan tarihi ayarla
+    const now = new Date();
+    const roundedMinutes = Math.ceil(now.getMinutes() / 30) * 30;
+    now.setMinutes(roundedMinutes);
+    datePicker.setDate(now);
+});
+</script>
 {% endblock %} 

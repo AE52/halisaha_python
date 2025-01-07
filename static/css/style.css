@@ -286,11 +286,13 @@ body {
 }
 
 .team-a-area {
-    right: 0;
+    left: 0;
+    right: 50%;
 }
 
 .team-b-area {
-    left: 0;
+    left: 50%;
+    right: 0;
 }
 
 /* Futbol sahası */
@@ -457,11 +459,11 @@ body {
 }
 
 .team-a-indicator {
-    right: 20px;
+    left: 20px;
 }
 
 .team-b-indicator {
-    left: 20px;
+    right: 20px;
 }
 
 /* Oyuncu havuzu */
@@ -976,4 +978,64 @@ body {
 
 .form-range::-webkit-slider-runnable-track {
     background: rgba(255, 255, 255, 0.1);
+} 
+
+/* Flatpickr özelleştirmeleri */
+.flatpickr-calendar {
+    background: var(--card-gradient) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
+}
+
+.flatpickr-day {
+    color: var(--text-color) !important;
+    border-radius: 5px !important;
+}
+
+.flatpickr-day.selected {
+    background: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+}
+
+.flatpickr-day:hover {
+    background: rgba(52, 152, 219, 0.2) !important;
+}
+
+.flatpickr-time {
+    background: var(--card-gradient) !important;
+}
+
+.flatpickr-time input {
+    color: var(--text-color) !important;
+}
+
+.numInputWrapper:hover {
+    background: rgba(255,255,255,0.1) !important;
+} 
+
+/* Tarih seçici stilleri */
+.input-group-text {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.input-group-text:hover {
+    background: #2980b9;
+}
+
+.input-group-append {
+    cursor: pointer;
+}
+
+.flatpickr-input {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: var(--text-color) !important;
+}
+
+.flatpickr-calendar {
+    margin-top: 2px !important;
 } 
