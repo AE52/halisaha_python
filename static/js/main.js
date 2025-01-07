@@ -1146,4 +1146,41 @@ async function markAllAsPaid(matchId) {
             text: translate('payment_update_error')
         });
     }
-} 
+}
+
+// Konfeti efekti
+function playConfetti() {
+    confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#3498db', '#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6']
+    });
+}
+
+// Ses efekti
+function playClickSound() {
+    const audio = new Audio('/static/sounds/click.mp3');
+    audio.volume = 0.2; // Ses seviyesi
+    audio.play();
+}
+
+// Oyuncu kartına tıklama
+document.addEventListener('DOMContentLoaded', function() {
+    // Oyuncu kartları için
+    const playerCards = document.querySelectorAll('.player-card');
+    playerCards.forEach(card => {
+        card.addEventListener('click', function(e) {
+            playConfetti();
+            playClickSound();
+        });
+    });
+
+    // Maç kartları için
+    const matchCards = document.querySelectorAll('.match-card');
+    matchCards.forEach(card => {
+        card.addEventListener('click', function(e) {
+            playClickSound();
+        });
+    });
+}); 

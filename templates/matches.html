@@ -19,12 +19,12 @@
                     <div class="row g-3">
                         <div class="col-12 col-md-4">
                             <div class="form-group">
-                                <label><i class="fas fa-calendar"></i> Tarih</label>
+                                <label><i class="fas fa-calendar"></i> {{ translate('date_label') }}</label>
                                 <input type="datetime-local" class="form-control" name="date" 
                                        value="{{ match.date.strftime('%Y-%m-%dT%H:%M') }}" required>
                             </div>
                             <div class="form-group mt-2">
-                                <label><i class="fas fa-map-marker-alt"></i> Konum</label>
+                                <label><i class="fas fa-map-marker-alt"></i> {{ translate('location_label') }}</label>
                                 <input type="text" class="form-control" name="location" 
                                        value="{{ match.location }}" required>
                             </div>
@@ -42,13 +42,13 @@
                             </div>
                             {% if match.is_upcoming %}
                             <div class="match-timer text-center mt-2" id="timer-{{ match.id }}">
-                                Kalan Süre: Yükleniyor...
+                                {{ translate('time_remaining', time='...') }}
                             </div>
                             {% endif %}
                         </div>
                         <div class="col-12 col-md-4">
                             <div class="form-group">
-                                <label><i class="fas fa-money-bill"></i> Toplam Ücret</label>
+                                <label><i class="fas fa-money-bill"></i> {{ translate('cost_label') }}</label>
                                 <input type="number" class="form-control" name="total_cost" 
                                        value="{{ match.total_cost }}" required>
                             </div>
@@ -59,7 +59,7 @@
                     </div>
                     <div class="text-center mt-3">
                         <button type="submit" class="btn btn-success btn-sm admin-only">
-                            <i class="fas fa-save"></i> Kaydet
+                            <i class="fas fa-save"></i> {{ translate('save') }}
                         </button>
                         <button type="button" class="btn btn-warning btn-sm admin-only" 
                                 onclick="markAllAsPaid({{ match.id }})">
@@ -67,7 +67,7 @@
                         </button>
                         <button type="button" class="btn btn-danger btn-sm admin-only" 
                                 onclick="deleteMatch({{ match.id }})">
-                            <i class="fas fa-trash"></i> Sil
+                            <i class="fas fa-trash"></i> {{ translate('delete') }}
                         </button>
                     </div>
                 </form>
@@ -78,7 +78,8 @@
         <!-- Geçmiş Maçlar -->
         <h4 class="mb-3 mt-5">{{ translate('pastmatches') }}</h4>
         {% for match in matches if match.date < now %}
-        <div class="card match-card mb-3" onclick="window.location.href='/matches/{{ match.id }}'">
+        <div class="card match-card mb-3" 
+             onclick="playClickSound(); window.location.href='/matches/{{ match.id }}'">
             <div class="card-body">
                 <div class="row g-3">
                     <div class="col-12 col-md-4">

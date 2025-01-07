@@ -101,6 +101,44 @@ translations = {
         # İletişim
         'email': 'asimerenozdemir@gmail.com',
         'phone': '+90 545 130 5234',
-        'contact_info': 'İletişim Bilgileri'
+        'contact_info': 'İletişim Bilgileri',
+
+        # Oyuncu profili
+        'player_stats': 'Oyuncu İstatistikleri',
+        'total_matches': 'Toplam Maç',
+        'wins': 'Galibiyet',
+        'losses': 'Mağlubiyet',
+        'win_rate': 'Kazanma Oranı',
+        'player_values': 'Oyuncu Değerleri',
+        'pace': 'Hız',
+        'shooting': 'Şut',
+        'passing': 'Pas',
+        'dribbling': 'Dribling',
+        'defending': 'Defans',
+        'physical': 'Fizik',
+        'match_history': 'Maç Geçmişi',
+        'payment_history': 'Ödeme Geçmişi',
+        'payment_status': 'Ödeme Durumu',
+        'total_debt': 'Toplam Borç: {amount} TL',
+        'paid_amount': 'Ödenen: {amount} TL',
+        'remaining_amount': 'Kalan: {amount} TL',
+
+        # Form etiketleri
+        'date_label': 'Tarih',
+        'location_label': 'Konum',
+        'cost_label': 'Toplam Ücret',
+
+        # Maç detayları
+        'total_cost': 'Toplam Ücret',
+        'per_person': 'Kişi Başı',
+        'score': 'Skor',
+        'location': 'Konum',
+        'date': 'Tarih',
+        'time': 'Saat',
+        'team_a_score': 'A Takımı Skoru',
+        'team_b_score': 'B Takımı Skoru',
+        'match_date': 'Maç Tarihi',
+        'match_location': 'Maç Konumu',
+        'match_cost': 'Maç Ücreti'
     }
 } 

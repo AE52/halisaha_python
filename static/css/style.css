@@ -1047,3 +1047,30 @@ body {
 .flatpickr-calendar {
     margin-top: 2px !important;
 } 
+
+/* Oyuncu kartı hover efekti */
+.player-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.player-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+}
+
+/* Maç kartı hover efekti */
+.match-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.match-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+/* Tıklama animasyonu */
+.player-card:active, .match-card:active {
+    transform: scale(0.98);
+} 

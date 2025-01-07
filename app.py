@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory
 from models import db, Player, Match, MatchPlayer, API_KEY
 from config import Config
 from functools import wraps
@@ -568,6 +568,10 @@ def mark_all_paid(match_id):
 @app.before_request
 def before_request():
     session['lang'] = 'tr'  # Her zaman Türkçe olacak
+
+@app.route('/static/sounds/<path:filename>')
+def serve_sound(filename):
+    return send_from_directory('static/sounds', filename)
 
 if __name__ == '__main__':
     app.run(debug=True) 
