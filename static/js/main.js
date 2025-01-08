@@ -1390,3 +1390,200 @@ function handleAdminLogout() {
     // Sayfayı ana sayfaya yönlendir
     window.location.href = '/';
 } 
+
+// Form işlemleri için güvenlik kontrolü ekleyelim
+document.addEventListener('DOMContentLoaded', function() {
+    // Form elementini seç
+    const commentForm = document.getElementById('commentForm');
+    
+    if (commentForm) {  // Form varsa işlem yap
+        commentForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Input elementini seç
+            const commentInput = document.getElementById('commentText');
+            
+            // Input kontrolü
+            if (!commentInput) {
+                console.error('Yorum input elementi bulunamadı');
+                return;
+            }
+            
+            const commentText = commentInput.value;
+            
+            if (!commentText.trim()) {
+                alert('Lütfen bir yorum yazın');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/players/{{ player._id }}/comments`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        text: commentText
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Yorum gönderilemedi');
+                }
+
+                const comment = await response.json();
+                
+                // Yeni yorumu listeye ekle
+                const commentsList = document.getElementById('commentsList');
+                if (commentsList) {
+                    const commentHtml = `
+                        <div class="comment-item">
+                            <div class="comment-header">
+                                <strong>${comment.commenter_name}</strong>
+                                <small>${new Date(comment.created_at).toLocaleString('tr-TR', {
+                                    timeZone: 'Europe/Istanbul'
+                                })}</small>
+                            </div>
+                            <p>${comment.text}</p>
+                        </div>
+                    `;
+                    commentsList.insertAdjacentHTML('afterbegin', commentHtml);
+                }
+                
+                // Formu temizle
+                commentInput.value = '';
+
+            } catch (error) {
+                console.error('Yorum hatası:', error);
+                alert(error.message || 'Yorum gönderilemedi. Lütfen tekrar deneyin.');
+            }
+        });
+    }
+});
+
+// TC güncelleme fonksiyonu
+async function updateTC(playerId) {
+    try {
+        const newTC = prompt('Yeni TC kimlik numarasını girin:');
+        if (!newTC) return;
+
+        const response = await fetch(`/api/players/${playerId}/update-tc`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'include',  // Cookie'leri gönder
+            body: JSON.stringify({
+                tc_no: newTC
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            if (response.status === 403) {
+                alert('Bu işlem için admin yetkisi gereklidir!');
+                window.location.href = '/admin-login';
+                return;
+            }
+            throw new Error(data.error || 'TC güncellenemedi');
+        }
+
+        alert('TC kimlik numarası başarıyla güncellendi');
+        location.reload();
+
+    } catch (error) {
+        console.error('TC güncelleme hatası:', error);
+        alert(error.message || 'TC güncellenemedi. Lütfen tekrar deneyin.');
+    }
+}
+
+// Reaksiyon güncelleme fonksiyonu
+async function updateReactionCounts(likes, dislikes) {
+    try {
+        const response = await fetch(`/api/players/${playerId}/reactions/update`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'include',  // Cookie'leri gönder
+            body: JSON.stringify({
+                likes: likes,
+                dislikes: dislikes
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            if (response.status === 403) {
+                alert('Bu işlem için admin yetkisi gereklidir!');
+                window.location.href = '/admin-login';
+                return;
+            }
+            throw new Error(data.error || 'Beğeni sayıları güncellenemedi');
+        }
+
+        // UI güncelleme
+        document.getElementById('likes-count').textContent = data.likes;
+        document.getElementById('dislikes-count').textContent = data.dislikes;
+
+        // Yüzdeleri güncelle
+        const total = data.likes + data.dislikes;
+        const likePercent = total > 0 ? (data.likes / total * 100) : 0;
+        const dislikePercent = total > 0 ? (data.dislikes / total * 100) : 0;
+
+        document.getElementById('like-percent').textContent = `%${likePercent.toFixed(1)}`;
+        document.getElementById('dislike-percent').textContent = `%${dislikePercent.toFixed(1)}`;
+
+        // SVG path'leri güncelle
+        document.querySelector('.circle-like').setAttribute('stroke-dasharray', `${likePercent}, 100`);
+        document.querySelector('.circle-dislike').setAttribute('stroke-dasharray', `${dislikePercent}, 100`);
+        document.querySelector('.circle-dislike').setAttribute('transform', `rotate(${likePercent * 3.6} 18 18)`);
+
+    } catch (error) {
+        console.error('Güncelleme hatası:', error);
+        alert(error.message || 'Beğeni sayıları güncellenemedi. Lütfen tekrar deneyin.');
+    }
+} 
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Form kontrolü
+    const commentForm = document.getElementById('commentForm');
+    if (commentForm) {
+        commentForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const commentInput = document.getElementById('commentText');
+            if (!commentInput) return;
+            // ... form işlemleri
+        });
+    }
+
+    // Sürükle-bırak kontrolü
+    function initDragAndDrop() {
+        const dragElements = document.querySelectorAll('.draggable');
+        if (!dragElements || dragElements.length === 0) return;
+        
+        dragElements.forEach(element => {
+            if (element) {
+                element.addEventListener('dragstart', handleDragStart);
+                // ... diğer sürükle-bırak işlemleri
+            }
+        });
+    }
+
+    // Tarih kontrolü
+    function initDateHandling() {
+        const dateElement = document.querySelector('.date-element');
+        if (!dateElement || !dateElement.dates) return;
+        // ... tarih işlemleri
+    }
+
+    // İşlevleri çağır
+    initDragAndDrop();
+    initDateHandling();
+}); 

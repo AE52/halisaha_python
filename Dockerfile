@@ -6,6 +6,7 @@ WORKDIR /app
 
 # Environment variables
 ENV PORT=8080
+ENV TZ=Europe/Istanbul
 
 # Sistem bağımlılıklarını yükle
 RUN apt-get update && apt-get install -y \
@@ -29,3 +30,6 @@ EXPOSE ${PORT}
 
 # Uygulamayı başlat
 CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 app:app 
+
+# Timezone ayarlama
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone 

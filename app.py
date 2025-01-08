@@ -8,6 +8,7 @@ import jwt
 from pymongo import MongoClient
 import os
 from bson import ObjectId
+import pytz  # Ekleyin
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -258,6 +259,15 @@ def get_player_card_class(overall):
     except (TypeError, ValueError):
         return 'bronze'
 
+# Türkiye saat dilimi için yardımcı fonksiyon
+def get_turkey_time(utc_time=None):
+    turkey_tz = pytz.timezone('Europe/Istanbul')
+    if utc_time is None:
+        utc_time = datetime.now(timezone.utc)
+    elif not utc_time.tzinfo:
+        utc_time = pytz.utc.localize(utc_time)
+    return utc_time.astimezone(turkey_tz)
+
 @app.context_processor
 def utility_processor():
     def get_player_info(player_id):
@@ -287,7 +297,8 @@ def utility_processor():
         translate=get_translation,
         get_player_card_class=get_player_card_class,
         get_stat_class=get_stat_class,
-        get_player_info=get_player_info
+        get_player_info=get_player_info,
+        get_turkey_time=get_turkey_time
     )
 
 def get_stat_class(value):
@@ -704,7 +715,7 @@ def create_match():
         
         # Yeni maç oluştur
         match_data = {
-            "date": datetime.strptime(data['date'], '%Y-%m-%dT%H:%M'),
+            "date": datetime.strptime(data['date'], '%Y-%m-%dT%H:%M').replace(tzinfo=timezone.utc),  # UTC olarak kaydet
             "location": data['location'],
             "total_cost": float(data['total_cost']),
             "teams": {
@@ -1096,41 +1107,35 @@ def add_reaction(id):
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/players/<id>/reactions/update', methods=['POST'])
-@admin_api_required
 def update_reactions(id):
     try:
-        data = request.json
-        likes = int(data.get('likes', 0))
-        dislikes = int(data.get('dislikes', 0))
-        
+        # ...
         result = reactions.update_one(
             {"player_id": id},
             {
                 "$set": {
                     "likes": likes,
                     "dislikes": dislikes,
-                    "updated_at": datetime.now(timezone.utc)
+                    "updated_at": datetime.now(timezone.utc)  # UTC olarak kaydet
                 }
             },
             upsert=True
         )
-        
-        if result.modified_count > 0 or result.upserted_id:
-            return jsonify({
-                "success": True,
-                "likes": likes,
-                "dislikes": dislikes
-            })
-        else:
-            return jsonify({"error": "Güncelleme başarısız"}), 500
-            
+        # ...
+
     except Exception as e:
         print(f"Reaksiyon güncelleme hatası: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/players/<id>/update-tc', methods=['POST'])
-@admin_api_required
 def update_player_tc(id):
+    # Admin kontrolü
+    if not is_admin():
+        return jsonify({
+            "error": "Bu işlem için admin yetkisi gereklidir",
+            "redirect_url": url_for('admin_login')
+        }), 403
+        
     try:
         data = request.json
         new_tc = data.get('tc_no')
@@ -1172,6 +1177,24 @@ def page_not_found(e):
     return render_template('404.html', 
                          error_message="İstediğiniz sayfa bulunamadı.",
                          error_details=str(e)), 404
+
+# Static dosyalar için route ekleyin
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory('static', filename)
+
+# Varsayılan resimler için özel route
+@app.route('/static/img/<path:filename>')
+def serve_images(filename):
+    try:
+        return send_from_directory('static/img', filename)
+    except:
+        # Varsayılan resim bulunamazsa alternatif resim döndür
+        if filename == 'default-avatar.png':
+            return send_from_directory('static/img', 'placeholder-avatar.png')
+        elif filename.startswith('flags/'):
+            return send_from_directory('static/img', 'placeholder-flag.png')
+        return '', 404
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080))) 
