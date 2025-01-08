@@ -171,17 +171,17 @@
         <div class="col-lg-4">
             <div class="match-history">
                 {% for match in stats.match_history %}
-                <a href="{{ url_for('match_detail', id=match.match_id) }}" class="match-card {{ 'win' if match.is_winner else 'loss' if not match.is_draw else 'draw' }}">
-                    <div class="match-info">
-                        <div class="match-date">{{ match.date.strftime('%d/%m/%Y') }}</div>
-                        <div class="match-score">{{ match.score_team_a|default('-') }} - {{ match.score_team_b|default('-') }}</div>
-                        <div class="match-location">{{ match.location }}</div>
-                        <div class="match-payment">
-                            <span class="amount">{{ "%.2f"|format(match.payment_amount) }} TL</span>
-                            <i class="fas fa-{{ 'check-circle' if match.has_paid else 'times-circle' }}"></i>
-                        </div>
+                <div class="match-card" onclick="window.location.href='{{ url_for('match_detail', id=match.match_id) }}'">
+                    <div class="match-date">{{ match.date.strftime('%d/%m/%Y') }}</div>
+                    <div class="match-score">
+                        {{ match.score_team_a|default('-') }} - {{ match.score_team_b|default('-') }}
                     </div>
-                </a>
+                    <div class="match-location">{{ match.location }}</div>
+                    <div class="match-payment">
+                        <span class="amount">{{ "%.2f"|format(match.payment_amount) }} TL</span>
+                        <i class="fas fa-{{ 'check-circle' if match.has_paid else 'times-circle' }}"></i>
+                    </div>
+                </div>
                 {% endfor %}
             </div>
         </div>

@@ -137,18 +137,29 @@ class Match:
     @staticmethod
     def get_by_id(id):
         try:
-            print(f"Maç aranıyor. ID: {id}")  # Debug log
-            # ID string olarak geldiğinden direkt olarak kullan
-            match = matches.find_one({"_id": str(id)})
+            # Önce string ID ile dene
+            match = matches.find_one({"_id": id})
+            
+            # Bulunamazsa ObjectId ile dene
+            if not match and isinstance(id, str):
+                try:
+                    match = matches.find_one({"_id": ObjectId(id)})
+                except:
+                    pass
             
             if match:
-                print(f"Maç bulundu: {match}")  # Debug log
+                # Her oyuncu için bilgileri al
+                for team in ['a', 'b']:
+                    for player in match['teams'][team]:
+                        player_info = Player.get_by_id(player['player_id'])
+                        if player_info:
+                            player.update(player_info)
                 return match
-                
-            print(f"Maç bulunamadı. ID: {id}")  # Debug log
+            
+            print(f"Maç bulunamadı. ID: {id}")
             return None
         except Exception as e:
-            print(f"Maç getirme hatası: {str(e)}")  # Debug log
+            print(f"Maç getirme hatası: {str(e)}")
             return None
     
     @staticmethod
@@ -246,7 +257,7 @@ class Match:
                 player_info = next(p for p in match['teams'][team] if p['player_id'] == str(player_id))
                 
                 # MongoDB ObjectId'yi string'e çevir
-                match_id = str(match['_id'])
+                match_id = str(match['_id']) if isinstance(match['_id'], ObjectId) else match['_id']
                 
                 match_history.append({
                     'match_id': match_id,

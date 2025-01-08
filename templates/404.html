@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="error-container">
+    <div class="error-content">
+        <div class="error-code">404</div>
+        <h1 class="error-title">Sayfa Bulunamadı</h1>
+        <div class="error-message">
+            <p>{{ error_message if error_message else "İstediğiniz sayfa bulunamadı." }}</p>
+            <p class="error-details">
+                {% if error_details %}
+                <code>{{ error_details }}</code>
+                {% endif %}
+            </p>
+        </div>
+        <div class="error-actions">
+            <a href="{{ url_for('index') }}" class="btn btn-primary">
+                <i class="fas fa-home"></i> Ana Sayfa
+            </a>
+            <a href="javascript:history.back()" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Geri Dön
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.error-container {
+    min-height: 70vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+}
+
+.error-content {
+    max-width: 600px;
+    background: rgba(0,0,0,0.7);
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+}
+
+.error-code {
+    font-size: 8rem;
+    font-weight: bold;
+    color: #e74c3c;
+    text-shadow: 0 0 10px rgba(231,76,60,0.5);
+    margin-bottom: 1rem;
+}
+
+.error-title {
+    font-size: 2rem;
+    color: #fff;
+    margin-bottom: 1rem;
+}
+
+.error-message {
+    color: #bdc3c7;
+    margin-bottom: 2rem;
+}
+
+.error-details {
+    background: rgba(0,0,0,0.3);
+    padding: 1rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+    font-family: monospace;
+    color: #e74c3c;
+}
+
+.error-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.error-actions .btn {
+    padding: 0.5rem 1.5rem;
+    font-size: 1.1rem;
+}
+</style>
+{% endblock %} 

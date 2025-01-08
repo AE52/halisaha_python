@@ -946,8 +946,9 @@ def match_detail(id):
         match = Match.get_by_id(id)
         
         if not match:
-            flash('Maç bulunamadı', 'error')
-            return redirect(url_for('matches'))
+            return render_template('404.html',
+                                error_message=f"Maç bulunamadı (ID: {id})",
+                                error_details="Maç silinmiş veya ID hatalı olabilir."), 404
         
         # Token varsa doğrula
         if is_admin:
@@ -967,8 +968,9 @@ def match_detail(id):
                              match=match,
                              is_admin=is_admin)
     except Exception as e:
-        flash('Maç detayı görüntülenirken bir hata oluştu', 'error')
-        return redirect(url_for('matches'))
+        return render_template('404.html',
+                             error_message="Maç detayı görüntülenirken bir hata oluştu",
+                             error_details=str(e)), 404
 
 @app.template_filter('get_stat_class')
 def get_stat_class(value):
@@ -1009,5 +1011,11 @@ def health_check():
     except Exception as e:
         return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html', 
+                         error_message="İstediğiniz sayfa bulunamadı.",
+                         error_details=str(e)), 404
+
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080))) 
