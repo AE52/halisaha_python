@@ -171,7 +171,7 @@
         <div class="col-lg-4">
             <div class="match-history">
                 {% for match in stats.match_history %}
-                <div class="match-card" onclick="window.location.href='{{ url_for('match_detail', id=match.match_id) }}'">
+                <div class="match-card" onclick="window.location.href='/matches/{{ match.match_id }}'">
                     <div class="match-date">{{ match.date.strftime('%d/%m/%Y') }}</div>
                     <div class="match-score">
                         {{ match.score_team_a|default('-') }} - {{ match.score_team_b|default('-') }}

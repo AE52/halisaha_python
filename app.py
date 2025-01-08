@@ -165,11 +165,28 @@ def get_player_card_class(overall):
 
 @app.route('/')
 def index():
+    # Admin kontrolü
     is_admin = bool(request.cookies.get('jwt_token'))
-    is_logged_in = bool(request.cookies.get('player_token'))
+    
+    # Oyuncu kontrolü
+    player_token = request.cookies.get('player_token')
+    is_logged_in = False
+    current_user = None
+    
+    if player_token:
+        try:
+            data = jwt.decode(player_token, app.config['SECRET_KEY'], algorithms=["HS256"])
+            player_id = data.get('player_id')
+            if player_id:
+                current_user = Player.get_by_id(player_id)
+                is_logged_in = True
+        except:
+            pass
+    
     return render_template('index.html', 
                          is_admin=is_admin,
-                         is_logged_in=is_logged_in)
+                         is_logged_in=is_logged_in,
+                         current_user=current_user)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -279,36 +296,6 @@ def players():
         is_admin = bool(request.cookies.get('jwt_token'))
         players_list = Player.get_all_active()
         
-        # Her oyuncu için overall değerini hesapla
-        for player in players_list:
-            stats = player.get('stats', {})
-            weights = {
-                'Kaleci': {'pace': 0.1, 'shooting': 0, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.4, 'physical': 0.2},
-                'Defans': {'pace': 0.2, 'shooting': 0.1, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.3, 'physical': 0.1},
-                'Orta Saha': {'pace': 0.15, 'shooting': 0.2, 'passing': 0.25, 'dribbling': 0.2, 'defending': 0.1, 'physical': 0.1},
-                'Forvet': {'pace': 0.2, 'shooting': 0.3, 'passing': 0.15, 'dribbling': 0.2, 'defending': 0.05, 'physical': 0.1}
-            }
-            
-            w = weights.get(player.get('position', 'Orta Saha'))
-            player['overall'] = int(
-                stats.get('pace', 70) * w['pace'] +
-                stats.get('shooting', 70) * w['shooting'] +
-                stats.get('passing', 70) * w['passing'] +
-                stats.get('dribbling', 70) * w['dribbling'] +
-                stats.get('defending', 70) * w['defending'] +
-                stats.get('physical', 70) * w['physical']
-            )
-            
-            # Stats değerlerini direkt olarak player objesine ekle
-            player['stats'] = {
-                'pace': stats.get('pace', 70),
-                'shooting': stats.get('shooting', 70),
-                'passing': stats.get('passing', 70),
-                'dribbling': stats.get('dribbling', 70),
-                'defending': stats.get('defending', 70),
-                'physical': stats.get('physical', 70)
-            }
-            
         return render_template('players.html', 
                              players=players_list,
                              is_admin=is_admin)
@@ -550,30 +537,45 @@ def player_profile(id):
     try:
         player = Player.get_by_id(id)
         if not player:
-            flash('Oyuncu bulunamadı', 'error')
-            return redirect(url_for('players'))
-        
-        # Oyuncunun istatistiklerini al
-        stats = Player.get_stats(id)
-        
-        # Beğeni istatistiklerini al
+            return render_template('404.html',
+                                error_message=f"Oyuncu bulunamadı (ID: {id})",
+                                error_details="Oyuncu silinmiş veya ID hatalı olabilir."), 404
+
+        # Beğeni/beğenmeme sayılarını al
         reactions = Player.get_reactions(id)
         total_reactions = reactions['likes'] + reactions['dislikes']
+        
+        # Yüzdeleri hesapla
         like_percent = (reactions['likes'] / total_reactions * 100) if total_reactions > 0 else 0
         dislike_percent = (reactions['dislikes'] / total_reactions * 100) if total_reactions > 0 else 0
-        
+
+        # Oyuncunun maç istatistiklerini al
+        match_stats = player.get('match_stats', {
+            'total_matches': 0,
+            'wins': 0,
+            'draws': 0,
+            'losses': 0,
+            'win_rate': 0,
+            'match_history': [],
+            'payment_stats': {
+                'total_debt': "0.00",
+                'total_paid': "0.00",
+                'remaining': "0.00"
+            }
+        })
+
         return render_template('player_profile.html',
                              player=player,
-                             stats=stats,
+                             stats=match_stats,
                              like_count=reactions['likes'],
                              dislike_count=reactions['dislikes'],
                              like_percent=like_percent,
-                             dislike_percent=dislike_percent,
-                             is_logged_in=bool(request.cookies.get('player_token')))
+                             dislike_percent=dislike_percent)
     except Exception as e:
-        print(f"Oyuncu profili hatası: {str(e)}")
-        flash('Oyuncu profili görüntülenirken bir hata oluştu', 'error')
-        return redirect(url_for('players'))
+        print(f"Oyuncu profili hatası: {str(e)}")  # Hata logla
+        return render_template('404.html',
+                             error_message="Oyuncu profili görüntülenirken bir hata oluştu",
+                             error_details=str(e)), 404
 
 @app.route('/new-match', methods=['GET'])
 @admin_required
@@ -712,33 +714,33 @@ def serve_sound(filename):
 
 @app.route('/player-login', methods=['GET', 'POST'])
 def player_login():
-    # Admin girişi yapılmışsa oyuncu girişine izin verme
-    admin_token = request.cookies.get('jwt_token')
-    if admin_token:
-        try:
-            jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            flash(get_translation('admin_already_logged_in'), 'warning')
-            return redirect(url_for('index'))
-        except:
-            pass
-    
     if request.method == 'POST':
         tc_no = request.form.get('tc_no')
+        
+        if not tc_no:
+            flash('TC Kimlik No gerekli', 'error')
+            return redirect(url_for('player_login'))
+            
         player = Player.get_by_tc(tc_no)
         
         if player:
+            # JWT token oluştur
             token = jwt.encode({
-                'player_id': player['_id'],
-                'exp': datetime.utcnow() + timedelta(hours=24)
+                'player_id': str(player['_id']),
+                'exp': datetime.utcnow() + timedelta(days=7)
             }, app.config['SECRET_KEY'])
             
-            session['player_id'] = player['_id']
+            # Session'a oyuncu bilgilerini kaydet
+            session['player_id'] = str(player['_id'])
             
+            # Token'ı cookie'ye kaydet ve yönlendir
             response = make_response(redirect(url_for('index')))
-            response.set_cookie('player_jwt', token, httponly=True, secure=True)
+            response.set_cookie('player_token', token, httponly=True)
+            flash('Başarıyla giriş yaptınız!', 'success')
             return response
         else:
-            flash(get_translation('invalid_tc'), 'error')
+            flash('Geçersiz TC Kimlik No', 'error')
+            return redirect(url_for('player_login'))
     
     return render_template('player_login.html')
 
@@ -746,7 +748,8 @@ def player_login():
 def player_logout():
     session.pop('player_id', None)
     response = make_response(redirect(url_for('index')))
-    response.delete_cookie('player_jwt')
+    response.delete_cookie('player_token')  # player_token'ı sil
+    flash('Başarıyla çıkış yaptınız', 'success')
     return response
 
 @app.route('/api/comments/<int:player_id>', methods=['POST'])
@@ -1016,6 +1019,93 @@ def page_not_found(e):
     return render_template('404.html', 
                          error_message="İstediğiniz sayfa bulunamadı.",
                          error_details=str(e)), 404
+
+@app.context_processor
+def inject_user():
+    try:
+        # Admin kontrolü
+        admin_token = request.cookies.get('jwt_token')
+        if admin_token:
+            try:
+                jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
+                return {'is_admin': True, 'is_logged_in': False, 'current_user': None}
+            except:
+                pass
+
+        # Oyuncu kontrolü
+        player_token = request.cookies.get('player_token')
+        if player_token:
+            try:
+                data = jwt.decode(player_token, app.config['SECRET_KEY'], algorithms=["HS256"])
+                player_id = data.get('player_id')
+                if player_id:
+                    player = Player.get_by_id(player_id)
+                    if player:
+                        return {
+                            'is_admin': False,
+                            'is_logged_in': True,
+                            'current_user': player
+                        }
+            except:
+                pass
+
+        return {
+            'is_admin': False,
+            'is_logged_in': False,
+            'current_user': None
+        }
+    except Exception as e:
+        print(f"inject_user hatası: {str(e)}")
+        return {
+            'is_admin': False,
+            'is_logged_in': False,
+            'current_user': None
+        }
+
+@app.route('/api/players/<id>/reaction', methods=['POST'])
+def add_reaction(id):
+    try:
+        data = request.json
+        is_like = data.get('is_like')
+        
+        # Admin kontrolü
+        is_admin = False
+        admin_token = request.cookies.get('jwt_token')
+        if admin_token:
+            try:
+                jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
+                is_admin = True
+            except:
+                pass
+
+        # Oyuncu kontrolü
+        player_token = request.cookies.get('player_token')
+        if not is_admin and not player_token:
+            return jsonify({"error": "Beğeni/beğenmeme için giriş yapmalısınız"}), 401
+
+        # Kullanıcı ID'sini belirle
+        user_id = None
+        if is_admin:
+            user_id = "admin"
+        else:
+            try:
+                data = jwt.decode(player_token, app.config['SECRET_KEY'], algorithms=["HS256"])
+                user_id = data.get('player_id')
+            except:
+                return jsonify({"error": "Geçersiz oturum"}), 401
+
+        # Reaksiyonu ekle/güncelle
+        success = Player.add_or_update_reaction(id, user_id, is_like, is_admin)
+        
+        if success:
+            # Güncel beğeni sayılarını döndür
+            reactions = Player.get_reactions(id)
+            return jsonify(reactions)
+        else:
+            return jsonify({"error": "Beğeni eklenemedi"}), 500
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080))) 

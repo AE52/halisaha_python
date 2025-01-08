@@ -6,36 +6,61 @@
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header">
-                    <h4>{{ translate('player_login') }}</h4>
+                    <h3 class="text-center">Oyuncu Girişi</h3>
                 </div>
                 <div class="card-body">
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            {% for category, message in messages %}
-                                <div class="alert alert-{{ category if category != 'message' else 'info' }}">
-                                    {{ message }}
-                                </div>
-                            {% endfor %}
-                        {% endif %}
-                    {% endwith %}
-                    
                     <form method="POST">
                         <div class="form-group">
-                            <label>{{ translate('tc_no') }}</label>
-                            <input type="text" class="form-control" name="tc_no" 
-                                   required maxlength="11" pattern="\d{11}"
-                                   placeholder="12345678901">
-                            <small class="form-text text-muted">
-                                {{ translate('tc_help_text') }}
-                            </small>
+                            <label for="tc_no">TC Kimlik No</label>
+                            <input type="text" class="form-control" id="tc_no" name="tc_no" required>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-block">
-                            {{ translate('login') }}
-                        </button>
+                        <button type="submit" class="btn btn-primary btn-block">Giriş Yap</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+.card {
+    background: rgba(0,0,0,0.7);
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+}
+
+.card-header {
+    background: rgba(0,0,0,0.3);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
+}
+
+.form-group label {
+    color: #bdc3c7;
+}
+
+.form-control {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
+}
+
+.form-control:focus {
+    background: rgba(0,0,0,0.5);
+    border-color: #3498db;
+    color: #fff;
+    box-shadow: 0 0 0 0.2rem rgba(52,152,219,0.25);
+}
+
+.btn-primary {
+    margin-top: 20px;
+    background: #3498db;
+    border: none;
+}
+
+.btn-primary:hover {
+    background: #2980b9;
+}
+</style>
 {% endblock %} 

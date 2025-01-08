@@ -76,7 +76,7 @@
         <div class="players-grid">
             {% for player in players %}
             <div class="player-card {{ get_player_card_class(player.overall) }}" 
-                 onclick="window.location.href='/players/{{ player._id }}'"
+                 onclick="window.location.href='{{ url_for('player_profile', id=player._id) }}'"
                  data-id="{{ player._id }}">
                 <div class="card-content">
                     <!-- Üst Kısım: Overall ve Pozisyon -->
