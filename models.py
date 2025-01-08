@@ -400,40 +400,48 @@ class Match:
     @staticmethod
     def get_by_id(id):
         try:
-            # ID string veya int olabilir
-            if isinstance(id, str):
-                try:
-                    id = int(id)
-                except ValueError:
-                    if ObjectId.is_valid(id):
-                        id = ObjectId(id)
-                    else:
-                        return None
+            print(f"Maç aranıyor - ID: {id}, Type: {type(id)}")
             
-            match = matches.find_one({"_id": id})
-            if match:
-                match['_id'] = str(match['_id'])
-                
-                # Her takımdaki oyuncular için bilgileri al
-                for team in ['a', 'b']:
-                    for player in match['teams'][team]:
-                        player_info = Player.get_by_id(player['player_id'])
-                        if player_info:
-                            player.update({
-                                'name': player_info.get('name', 'İsimsiz'),
-                                'position': player_info.get('position', 'Belirsiz'),
-                                'stats': player_info.get('stats', {
-                                    'pace': 70,
-                                    'shooting': 70,
-                                    'passing': 70,
-                                    'dribbling': 70,
-                                    'defending': 70,
-                                    'physical': 70
-                                }),
-                                'overall': player_info.get('overall', 70)
-                            })
-                return match
-            return None
+            # Önce mevcut maçı bul
+            match = matches.find_one({"$or": [
+                {"_id": id},
+                {"_id": str(id)},
+                {"_id": int(id) if str(id).isdigit() else None},
+                {"_id": ObjectId(id) if ObjectId.is_valid(id) else None}
+            ]})
+            
+            if not match:
+                print(f"Maç bulunamadı: {id}")
+                return None
+            
+            print(f"Maç bulundu: {match['_id']}")
+            
+            # ID'yi string'e çevir
+            match['_id'] = str(match['_id'])
+            
+            # Her takımdaki oyuncular için bilgileri al
+            for team in ['a', 'b']:
+                for player in match['teams'][team]:
+                    player_info = Player.get_by_id(player['player_id'])
+                    if player_info:
+                        player.update({
+                            'name': player_info.get('name', 'İsimsiz'),
+                            'position': player_info.get('position', 'Belirsiz'),
+                            'stats': player_info.get('stats', {
+                                'pace': 70,
+                                'shooting': 70,
+                                'passing': 70,
+                                'dribbling': 70,
+                                'defending': 70,
+                                'physical': 70
+                            }),
+                            'overall': player_info.get('overall', 70)
+                        })
+                    else:
+                        print(f"Oyuncu bulunamadı: {player['player_id']}")
+                    
+            return match
+            
         except Exception as e:
             print(f"Maç getirme hatası: {str(e)}")
             return None

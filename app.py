@@ -1423,5 +1423,44 @@ def fix_database():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/debug/check-match/<id>')
+@admin_required
+def check_match(id):
+    try:
+        # Maçı farklı ID formatlarıyla ara
+        results = {
+            "original_id": id,
+            "found_with": None,
+            "match_data": None,
+            "id_formats": {
+                "as_is": matches.find_one({"_id": id}) is not None,
+                "as_string": matches.find_one({"_id": str(id)}) is not None,
+                "as_int": matches.find_one({"_id": int(id)}) if str(id).isdigit() else None,
+                "as_object_id": matches.find_one({"_id": ObjectId(id)}) if ObjectId.is_valid(id) else None
+            }
+        }
+        
+        # Maçı bul
+        match = Match.get_by_id(id)
+        if match:
+            results["found_with"] = "success"
+            results["match_data"] = {
+                "_id": match["_id"],
+                "date": str(match.get("date")),
+                "location": match.get("location"),
+                "teams": {
+                    "a": [{"id": p["player_id"], "name": p.get("name")} for p in match["teams"]["a"]],
+                    "b": [{"id": p["player_id"], "name": p.get("name")} for p in match["teams"]["b"]]
+                }
+            }
+        
+        return jsonify(results)
+        
+    except Exception as e:
+        return jsonify({
+            "error": str(e),
+            "original_id": id
+        }), 500
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080))) 
