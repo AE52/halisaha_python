@@ -929,7 +929,7 @@ document.getElementById('commentForm')?.addEventListener('submit', async functio
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'  // CSRF koruması için
+                'X-Requested-With': 'XMLHttpRequest'
             },
             body: JSON.stringify({
                 text: commentText
@@ -941,17 +941,20 @@ document.getElementById('commentForm')?.addEventListener('submit', async functio
             throw new Error(error.error || 'Yorum gönderilemedi');
         }
 
-        const comment = await response.json();
+        const data = await response.json();
         
         // Yeni yorumu listeye ekle
         const commentsList = document.getElementById('commentsList');
         const commentHtml = `
-            <div class="comment-item">
+            <div class="comment-item ${data.is_admin ? 'admin-comment' : ''}">
                 <div class="comment-header">
-                    <strong>${comment.commenter_name}</strong>
-                    <small>{{ get_turkey_time(comment.created_at).strftime('%d/%m/%Y %H:%M') }}</small>
+                    ${data.is_admin ? '<i class="fas fa-shield-alt"></i>' : ''}
+                    <strong>${data.commenter_name}</strong>
+                    <small>${new Date(data.created_at).toLocaleString('tr-TR', {
+                        timeZone: 'Europe/Istanbul'
+                    })}</small>
                 </div>
-                <p>${comment.text}</p>
+                <p>${data.text}</p>
             </div>
         `;
         commentsList.insertAdjacentHTML('afterbegin', commentHtml);
