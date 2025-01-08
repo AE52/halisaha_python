@@ -1,4 +1,4 @@
-# Base image olarak Python 3.9 kullan
+# Base image
 FROM python:3.9-slim
 
 # Çalışma dizinini ayarla
@@ -7,7 +7,14 @@ WORKDIR /app
 # Sistem bağımlılıklarını yükle
 RUN apt-get update && apt-get install -y \
     curl \
+    python3-dev \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Environment variables
+ENV PORT=8080
+ENV MONGO_URI="mongodb+srv://ae52:Erenemir1comehacker@cluster0.y5nv8.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+ENV MONGO_DB="halisaha_db"
 
 # Python bağımlılıklarını kopyala ve yükle
 COPY requirements.txt .
@@ -17,12 +24,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Non-root kullanıcı oluştur
-RUN useradd -m appuser
-RUN chown -R appuser:appuser /app
+RUN useradd -m appuser && \
+    chown -R appuser:appuser /app
 USER appuser
-
-# Port'u ortam değişkeninden al
-ENV PORT=8080
 
 # Health check tanımla
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \

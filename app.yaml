@@ -2,9 +2,9 @@ runtime: python39
 instance_class: F1
 
 env_variables:
-  MONGO_URI: "your_mongodb_uri"
-  MONGO_DB: "your_db_name"
-  SECRET_KEY: "your_secret_key"
+  MONGO_URI: "mongodb+srv://ae52:Erenemir1comehacker@cluster0.y5nv8.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+  MONGO_DB: "halisaha_db"
+  SECRET_KEY: "gizli-anahtar-123"
 
 handlers:
 - url: /.*
