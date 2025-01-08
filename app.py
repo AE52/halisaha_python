@@ -73,7 +73,7 @@ def get_user_type():
         if admin_token:
             try:
                 jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
-                return 'admin', None
+                return 'admin', 'admin'  # Admin için sabit bir ID
             except:
                 pass
 
@@ -1255,7 +1255,7 @@ def upload_avatar(id):
             print(f"Oyuncu bulunamadı: {id}")
             return jsonify({"error": "Oyuncu bulunamadı"}), 404
 
-        print(f"Oyuncu bulundu: {player.get('name')}, ID: {player['_id']}")
+        print(f"Oyuncu bulundu: {player.get('name')}")
 
         if 'avatar' not in request.files:
             return jsonify({"error": "Dosya seçilmedi"}), 400
@@ -1276,7 +1276,7 @@ def upload_avatar(id):
                 
                 # Yeni fotoğrafı yükle
                 timestamp = int(time.time())
-                player_id = player['_id']  # Bulunan oyuncunun ID'sini kullan
+                player_id = player['_id']
                 upload_path = f"avatars/player_{player_id}_{timestamp}"
                 print(f"Yeni fotoğraf yükleniyor: {upload_path}")
                 
@@ -1290,7 +1290,7 @@ def upload_avatar(id):
                 
                 print(f"Cloudinary yanıtı: {result}")
                 
-                # Veritabanını güncelle - bulunan oyuncunun ID'sini kullan
+                # Veritabanını güncelle
                 if Player.update_avatar(player_id, result):
                     return jsonify({
                         "success": True,
@@ -1304,7 +1304,7 @@ def upload_avatar(id):
                     
             except Exception as e:
                 print(f"Fotoğraf yükleme hatası: {str(e)}")
-                return jsonify({"error": "Fotoğraf yüklenemedi"}), 500
+                return jsonify({"error": str(e)}), 500
             
         return jsonify({"error": "Geçersiz dosya türü"}), 400
         
@@ -1461,6 +1461,76 @@ def check_match(id):
             "error": str(e),
             "original_id": id
         }), 500
+
+@app.route('/api/players/<id>/react', methods=['POST'])
+def react_to_player(id):
+    try:
+        # AJAX kontrolü
+        if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+            return jsonify({"error": "Invalid request"}), 400
+
+        # Kullanıcı kontrolü
+        user_type, user_id = get_user_type()
+        if not user_type or not user_id:
+            return jsonify({"error": "Giriş yapmalısınız"}), 403
+
+        # Request verilerini al
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        reaction_type = data.get('reaction_type')
+        if reaction_type not in ['like', 'dislike']:
+            return jsonify({"error": "Invalid reaction type"}), 400
+
+        print(f"Reaksiyon alındı - Type: {reaction_type}, User: {user_id}, Player: {id}")
+
+        # Mevcut reaksiyonları al
+        reaction_doc = reactions.find_one({"player_id": str(id)}) or {
+            "player_id": str(id),
+            "likes": 0,
+            "dislikes": 0,
+            "user_reactions": {}
+        }
+
+        # user_reactions yoksa oluştur
+        if 'user_reactions' not in reaction_doc:
+            reaction_doc['user_reactions'] = {}
+
+        # Kullanıcının önceki reaksiyonunu kontrol et
+        previous_reaction = reaction_doc['user_reactions'].get(str(user_id))
+
+        # Yeni reaksiyon ile aynıysa, reaksiyonu kaldır
+        if previous_reaction == reaction_type:
+            reaction_doc['user_reactions'].pop(str(user_id), None)
+            reaction_doc[f"{reaction_type}s"] = max(0, reaction_doc[f"{reaction_type}s"] - 1)
+        else:
+            # Önceki reaksiyonu kaldır
+            if previous_reaction:
+                reaction_doc[f"{previous_reaction}s"] = max(0, reaction_doc[f"{previous_reaction}s"] - 1)
+            
+            # Yeni reaksiyonu ekle
+            reaction_doc['user_reactions'][str(user_id)] = reaction_type
+            reaction_doc[f"{reaction_type}s"] = reaction_doc.get(f"{reaction_type}s", 0) + 1
+
+        print(f"Reaksiyon güncellendi: {reaction_doc}")
+
+        # Veritabanını güncelle
+        reactions.replace_one(
+            {"player_id": str(id)},
+            reaction_doc,
+            upsert=True
+        )
+
+        return jsonify({
+            "likes": reaction_doc.get('likes', 0),
+            "dislikes": reaction_doc.get('dislikes', 0),
+            "current_user_reaction": reaction_doc['user_reactions'].get(str(user_id))
+        })
+
+    except Exception as e:
+        print(f"Reaction error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080))) 

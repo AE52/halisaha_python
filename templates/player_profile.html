@@ -177,133 +177,183 @@
 
         <!-- Orta Kolon: Maç Geçmişi -->
         <div class="col-lg-4">
-            <div class="match-history">
-                {% for match in stats.match_history %}
-                <div class="match-card" onclick="window.location.href='/matches/{{ match.match_id }}'">
-                    <div class="match-date">{{ match.date.strftime('%d/%m/%Y') }}</div>
-                    <div class="match-score">
-                        {{ match.score_team_a|default('-') }} - {{ match.score_team_b|default('-') }}
+            <div class="match-history-section">
+                <h4 class="section-title">
+                    <i class="fas fa-history"></i> Maç Geçmişi
+                </h4>
+                <div class="match-history">
+                    {% for match in stats.match_history %}
+                    <div class="match-card {% if match.is_winner %}match-win{% elif match.is_draw %}match-draw{% else %}match-loss{% endif %}"
+                         onclick="window.location.href='/matches/{{ match.match_id }}'">
+                        <div class="match-header">
+                            <div class="match-date">
+                                <i class="far fa-calendar-alt"></i>
+                                {{ match.date.strftime('%d/%m/%Y') }}
+                            </div>
+                            <div class="match-location">
+                                <i class="fas fa-map-marker-alt"></i>
+                                {{ match.location }}
+                            </div>
+                        </div>
+                        
+                        <div class="match-details">
+                            <div class="match-score">
+                                <span class="score">{{ match.score_team_a|default('-') }}</span>
+                                <span class="score-divider">-</span>
+                                <span class="score">{{ match.score_team_b|default('-') }}</span>
+                            </div>
+                            <div class="match-result">
+                                {% if match.is_winner %}
+                                    <span class="badge badge-success">
+                                        <i class="fas fa-trophy"></i> Galibiyet
+                                    </span>
+                                {% elif match.is_draw %}
+                                    <span class="badge badge-warning">
+                                        <i class="fas fa-handshake"></i> Beraberlik
+                                    </span>
+                                {% else %}
+                                    <span class="badge badge-danger">
+                                        <i class="fas fa-times-circle"></i> Mağlubiyet
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="match-payment">
+                            <div class="payment-amount">
+                                <i class="fas fa-coins"></i>
+                                <span>{{ "%.2f"|format(match.payment_amount) }} TL</span>
+                            </div>
+                            <div class="payment-status">
+                                {% if match.has_paid %}
+                                    <span class="badge badge-success">
+                                        <i class="fas fa-check-circle"></i> Ödendi
+                                    </span>
+                                {% else %}
+                                    <span class="badge badge-danger">
+                                        <i class="fas fa-exclamation-circle"></i> Ödenmedi
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
-                    <div class="match-location">{{ match.location }}</div>
-                    <div class="match-payment">
-                        <span class="amount">{{ "%.2f"|format(match.payment_amount) }} TL</span>
-                        <i class="fas fa-{{ 'check-circle' if match.has_paid else 'times-circle' }}"></i>
-                    </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
             </div>
         </div>
 
         <!-- Sağ Kolon: Beğeniler ve Yorumlar -->
         <div class="col-lg-4">
-            <!-- Beğeni/Beğenmeme Sistemi -->
+            <!-- Beğeni Sistemi -->
             <div class="reactions-section">
-                <h4 class="reactions-title">
-                    <i class="fas fa-heart"></i> Sevenler / Sevmeyenler
-                    {% if is_admin %}
-                    <button class="btn btn-sm btn-edit" onclick="editReactions()">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    {% endif %}
+                <h4 class="section-title">
+                    <i class="fas fa-heart" style="color: #e74c3c;"></i> Sevenler / Sevmeyenler
                 </h4>
                 <div class="reactions-container">
-                    <!-- Beğeni Daire Grafiği -->
-                    <div class="rating-circle">
-                        <div class="rating-numbers">
-                            <div class="likes" {% if is_admin %}onclick="editLikes()"{% endif %}>
-                                <i class="fas fa-thumbs-up"></i>
-                                <span id="likes-count" class="{% if is_admin %}admin-editable{% endif %}">
-                                    {{ like_count }}
-                                </span>
-                            </div>
-                            <div class="dislikes" {% if is_admin %}onclick="editDislikes()"{% endif %}>
-                                <i class="fas fa-thumbs-down"></i>
-                                <span id="dislikes-count" class="{% if is_admin %}admin-editable{% endif %}">
-                                    {{ dislike_count }}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="circle-chart">
+                    <div class="reactions-stats">
+                        <div class="progress-circle">
                             <svg viewBox="0 0 36 36" class="circular-chart">
-                                <!-- Arka plan dairesi -->
                                 <path class="circle-bg"
-                                    d="M18 2.0845
-                                    a 15.9155 15.9155 0 0 1 0 31.831
-                                    a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                                <!-- Beğeni yüzdesi -->
+                                      d="M18 2.0845
+                                      a 15.9155 15.9155 0 0 1 0 31.831
+                                      a 15.9155 15.9155 0 0 1 0 -31.831"/>
                                 <path class="circle-like"
-                                    stroke-dasharray="{{ like_percent }}, 100"
-                                    d="M18 2.0845
-                                    a 15.9155 15.9155 0 0 1 0 31.831
-                                    a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                                <!-- Beğenmeme yüzdesi -->
+                                      stroke-dasharray="{{ like_percent }}, 100"
+                                      d="M18 2.0845
+                                      a 15.9155 15.9155 0 0 1 0 31.831
+                                      a 15.9155 15.9155 0 0 1 0 -31.831"/>
                                 <path class="circle-dislike"
-                                    stroke-dasharray="{{ dislike_percent }}, 100"
-                                    d="M18 2.0845
-                                    a 15.9155 15.9155 0 0 1 0 31.831
-                                    a 15.9155 15.9155 0 0 1 0 -31.831"
-                                    transform="rotate({{ like_percent * 3.6 }} 18 18)"/>
+                                      stroke-dasharray="{{ dislike_percent }}, 100"
+                                      transform="rotate({{ like_percent * 3.6 }} 18 18)"
+                                      d="M18 2.0845
+                                      a 15.9155 15.9155 0 0 1 0 31.831
+                                      a 15.9155 15.9155 0 0 1 0 -31.831"/>
                             </svg>
                             <div class="percentage-text">
-                                <span class="like-percent" id="like-percent">%{{ "%.1f"|format(like_percent) }}</span>
+                                <span class="like-percent">%{{ "%.1f"|format(like_percent) }}</span>
                                 <span class="percent-divider">/</span>
-                                <span class="dislike-percent" id="dislike-percent">%{{ "%.1f"|format(dislike_percent) }}</span>
+                                <span class="dislike-percent">%{{ "%.1f"|format(dislike_percent) }}</span>
                             </div>
                         </div>
+                        <div class="reaction-buttons">
+                            <button onclick="react('like')" class="btn-reaction {{ 'active' if current_user_reaction == 'like' }}">
+                                <i class="fas fa-thumbs-up"></i>
+                                <span id="likes-count">{{ like_count }}</span>
+                            </button>
+                            <button onclick="react('dislike')" class="btn-reaction {{ 'active' if current_user_reaction == 'dislike' }}">
+                                <i class="fas fa-thumbs-down"></i>
+                                <span id="dislikes-count">{{ dislike_count }}</span>
+                            </button>
+                        </div>
                     </div>
-
-                    <!-- Beğeni Butonları -->
-                    {% if is_logged_in or is_admin %}
-                    <div class="reaction-buttons">
-                        <button class="btn-reaction like {{ 'active' if current_user_reaction == 'like' }}" 
-                                onclick="handleReaction('like')">
-                            <i class="fas fa-thumbs-up"></i>
-                            <span>Beğen</span>
-                        </button>
-                        <button class="btn-reaction dislike {{ 'active' if current_user_reaction == 'dislike' }}" 
-                                onclick="handleReaction('dislike')">
-                            <i class="fas fa-thumbs-down"></i>
-                            <span>Beğenme</span>
-                        </button>
-                    </div>
-                    {% else %}
-                    <div class="login-message">
+                    {% if not is_logged_in and not is_admin %}
+                    <div class="login-required">
                         Beğeni/beğenmeme için giriş yapmalısınız
                     </div>
                     {% endif %}
                 </div>
             </div>
 
-            <!-- Yorumlar Kartı -->
-            <div class="comments-card mt-4">
-                <h4><i class="fas fa-comments"></i> Yorumlar</h4>
+            <!-- Yorumlar Bölümü (güncellenen stil) -->
+            <div class="comments-section dark-theme">
+                <h4 class="section-title">
+                    <i class="fas fa-comments"></i> Yorumlar
+                </h4>
+                
+                <!-- Yorum Formu -->
                 {% if is_logged_in or is_admin %}
-                <form id="commentForm" class="comment-form">
-                    <div class="input-group">
-                        <input type="text" class="form-control" id="commentText" placeholder="Yorum yaz...">
-                        <button class="btn btn-primary" type="submit">
-                            <i class="fas fa-paper-plane"></i>
+                <div class="comment-form">
+                    <form id="commentForm" onsubmit="submitComment(event)">
+                        <div class="form-group">
+                            <textarea id="commentText" class="form-control" rows="3" 
+                                    placeholder="Yorumunuzu yazın..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> Gönder
                         </button>
-                    </div>
-                </form>
+                    </form>
+                </div>
+                {% else %}
+                <div class="login-message">
+                    <i class="fas fa-lock"></i>
+                    Yorum yapmak için giriş yapmalısınız
+                </div>
                 {% endif %}
+
+                <!-- Yorumlar Listesi -->
                 <div class="comments-list" id="commentsList">
                     {% for comment in comments %}
                     <div class="comment-item {{ 'admin-comment' if comment.is_admin }}" data-id="{{ comment._id }}">
                         <div class="comment-header">
-                            {% if comment.is_admin %}
-                            <i class="fas fa-shield-alt"></i>
-                            {% endif %}
-                            <strong>{{ comment.commenter_name }}</strong>
-                            <small>{{ get_turkey_time(comment.created_at).strftime('%d/%m/%Y %H:%M') }}</small>
+                            <div class="commenter-info">
+                                <div class="commenter-avatar">
+                                    <img src="{{ comment.commenter_avatar|default('/static/img/default-avatar.png') }}" 
+                                         alt="{{ comment.commenter_name }}"
+                                         onerror="this.src='https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'">
+                                </div>
+                                <div class="commenter-details">
+                                    <div class="commenter-name">
+                                        {% if comment.is_admin %}
+                                        <i class="fas fa-shield-alt admin-badge" title="Admin"></i>
+                                        {% endif %}
+                                        {{ comment.commenter_name }}
+                                    </div>
+                                    <div class="comment-date">
+                                        {{ comment.created_at.strftime('%d/%m/%Y %H:%M') }}
+                                    </div>
+                                </div>
+                            </div>
                             {% if is_admin %}
-                            <button class="btn btn-sm btn-danger delete-comment" 
-                                    onclick="deleteComment('{{ comment._id }}')">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                            <div class="comment-actions">
+                                <button class="btn btn-sm btn-danger" onclick="deleteComment('{{ comment._id }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
                             {% endif %}
                         </div>
-                        <p>{{ comment.text }}</p>
+                        <div class="comment-content">
+                            {{ comment.text }}
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
@@ -436,70 +486,39 @@
 
 /* Beğeni Sistemi Stilleri */
 .reactions-section {
-    background: rgba(0,0,0,0.2);
+    background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
     border-radius: 15px;
     padding: 20px;
     margin-bottom: 20px;
-}
-
-.reactions-title {
-    color: white;
-    text-align: center;
-    margin-bottom: 20px;
-    font-size: 1.2em;
-}
-
-.reactions-title i {
-    color: #e74c3c;
-    margin-right: 8px;
+    color: #fff;
 }
 
 .reactions-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-}
-
-.rating-circle {
-    width: 200px;
-    position: relative;
     text-align: center;
 }
 
-.rating-numbers {
-    display: flex;
-    justify-content: center;
-    gap: 30px;
-    margin-bottom: 15px;
-    font-size: 1.2em;
+.reactions-stats {
+    background: rgba(0,0,0,0.3);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 10px;
 }
 
-.likes, .dislikes {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.likes i { color: #2ecc71; }
-.dislikes i { color: #e74c3c; }
-
-.circle-chart {
+.progress-circle {
     position: relative;
     width: 150px;
-    margin: 0 auto;
+    margin: 0 auto 20px;
 }
 
 .circular-chart {
     display: block;
-    margin: 10px auto;
-    max-width: 100%;
+    width: 100%;
     max-height: 150px;
 }
 
 .circle-bg {
     fill: none;
-    stroke: rgba(255,255,255,0.1);
+    stroke: #2c3e50;
     stroke-width: 2.8;
 }
 
@@ -525,63 +544,98 @@
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
-    font-size: 1.2em;
-    font-weight: bold;
+    width: 100%;
 }
 
-.like-percent { color: #2ecc71; }
-.percent-divider { color: rgba(255,255,255,0.5); margin: 0 5px; }
-.dislike-percent { color: #e74c3c; }
+.like-percent {
+    color: #2ecc71;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
 
-/* Beğeni Butonları */
+.percent-divider {
+    color: #666;
+    margin: 0 5px;
+    font-weight: 500;
+}
+
+.dislike-percent {
+    color: #e74c3c;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
 .reaction-buttons {
     display: flex;
-    gap: 15px;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 15px;
 }
 
 .btn-reaction {
-    padding: 10px 25px;
+    background: #2c3e50;
+    color: #fff;
     border: none;
-    border-radius: 25px;
-    color: white;
-    font-weight: bold;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
     display: flex;
     align-items: center;
     gap: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
 }
 
-.btn-reaction.like {
-    background: #2ecc71;
+.btn-reaction i {
+    font-size: 1.2rem;
 }
 
-.btn-reaction.dislike {
-    background: #e74c3c;
+.btn-reaction span {
+    font-weight: 600;
 }
 
 .btn-reaction:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }
 
 .btn-reaction.active {
-    transform: scale(1.1);
-    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    transform: scale(1.05);
 }
 
-.login-message {
-    color: rgba(255,255,255,0.7);
-    text-align: center;
-    padding: 10px;
-    background: rgba(0,0,0,0.2);
-    border-radius: 10px;
+.btn-reaction:nth-child(1) {
+    background: #27ae60;
+}
+
+.btn-reaction:nth-child(1):hover, 
+.btn-reaction:nth-child(1).active {
+    background: #2ecc71;
+    box-shadow: 0 0 15px rgba(46,204,113,0.4);
+}
+
+.btn-reaction:nth-child(2) {
+    background: #c0392b;
+}
+
+.btn-reaction:nth-child(2):hover,
+.btn-reaction:nth-child(2).active {
+    background: #e74c3c;
+    box-shadow: 0 0 15px rgba(231,76,60,0.4);
+}
+
+.login-required {
+    color: #666;
+    font-size: 0.9rem;
+    margin-top: 10px;
 }
 
 @keyframes progress {
     0% {
         stroke-dasharray: 0 100;
     }
+}
+
+/* Beğeni butonlarını gizle */
+.reaction-buttons {
+    display: none;
 }
 
 /* Yorum Kartı Stilleri */
@@ -874,306 +928,950 @@
 .avatar-upload label:hover {
     background-color: #0056b3;
 }
+
+/* Maç Geçmişi Stili */
+.match-history-section {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.section-title {
+    color: #2c3e50;
+    font-size: 1.25rem;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #eee;
+}
+
+.section-title i {
+    margin-right: 8px;
+    color: #3498db;
+}
+
+.match-history {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.match-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border-left: 4px solid #95a5a6;
+}
+
+.match-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Maç sonucuna göre renklendirme */
+.match-win {
+    border-left-color: #2ecc71;
+    background: linear-gradient(to right, rgba(46,204,113,0.1), transparent);
+}
+
+.match-draw {
+    border-left-color: #f1c40f;
+    background: linear-gradient(to right, rgba(241,196,15,0.1), transparent);
+}
+
+.match-loss {
+    border-left-color: #e74c3c;
+    background: linear-gradient(to right, rgba(231,76,60,0.1), transparent);
+}
+
+.match-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+.match-header i {
+    margin-right: 5px;
+}
+
+.match-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 15px 0;
+}
+
+.match-score {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.score-divider {
+    margin: 0 10px;
+    color: #95a5a6;
+}
+
+.match-result .badge {
+    font-size: 0.9rem;
+    padding: 8px 12px;
+}
+
+.match-payment {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(0,0,0,0.1);
+}
+
+.payment-amount {
+    color: #34495e;
+    font-weight: 500;
+}
+
+.payment-amount i {
+    color: #f1c40f;
+    margin-right: 5px;
+}
+
+.badge {
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.badge i {
+    margin-right: 4px;
+}
+
+.badge-success {
+    background-color: #2ecc71;
+    color: white;
+}
+
+.badge-warning {
+    background-color: #f1c40f;
+    color: white;
+}
+
+.badge-danger {
+    background-color: #e74c3c;
+    color: white;
+}
+
+/* Scrollbar Stili */
+.match-history::-webkit-scrollbar {
+    width: 8px;
+}
+
+.match-history::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.match-history::-webkit-scrollbar-thumb {
+    background: #95a5a6;
+    border-radius: 4px;
+}
+
+.match-history::-webkit-scrollbar-thumb:hover {
+    background: #7f8c8d;
+}
+
+/* Yorumlar Bölümü Stili */
+.comments-section {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.section-title {
+    color: #2c3e50;
+    font-size: 1.25rem;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #eee;
+}
+
+.section-title i {
+    margin-right: 8px;
+    color: #3498db;
+}
+
+/* Yorum Formu */
+.comment-form {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.comment-form textarea {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    resize: none;
+    font-size: 0.95rem;
+    padding: 12px;
+    margin-bottom: 10px;
+    transition: border-color 0.3s ease;
+}
+
+.comment-form textarea:focus {
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.comment-form button {
+    background: #3498db;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.comment-form button:hover {
+    background: #2980b9;
+    transform: translateY(-1px);
+}
+
+/* Yorumlar Listesi */
+.comments-list {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.comment-item {
+    background: #fff;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.3s ease;
+}
+
+.comment-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.admin-comment {
+    background: linear-gradient(to right, rgba(52, 152, 219, 0.05), transparent);
+    border-left: 4px solid #3498db;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.commenter-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.commenter-avatar {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.commenter-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.commenter-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.commenter-name {
+    font-weight: 600;
+    color: #2c3e50;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.admin-badge {
+    color: #3498db;
+    font-size: 0.9em;
+}
+
+.comment-date {
+    font-size: 0.85rem;
+    color: #7f8c8d;
+}
+
+.comment-content {
+    color: #34495e;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-top: 8px;
+    padding-left: 57px;  /* Avatar genişliği + gap */
+}
+
+.comment-actions {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.comment-item:hover .comment-actions {
+    opacity: 1;
+}
+
+.login-message {
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    color: #7f8c8d;
+    font-size: 0.95rem;
+}
+
+.login-message i {
+    margin-right: 8px;
+    color: #95a5a6;
+}
+
+/* Scrollbar Stili */
+.comments-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.comments-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.comments-list::-webkit-scrollbar-thumb {
+    background: #95a5a6;
+    border-radius: 4px;
+}
+
+.comments-list::-webkit-scrollbar-thumb:hover {
+    background: #7f8c8d;
+}
+
+/* Koyu Tema için Güncellenmiş Stiller */
+.match-history-section, .comments-section, .reactions-section {
+    background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    padding: 20px;
+    margin-bottom: 20px;
+    color: #fff;
+}
+
+.section-title {
+    color: #fff;
+    border-bottom: 2px solid #333;
+}
+
+.section-title i {
+    color: #3498db;
+}
+
+/* Beğeni Sistemi Stili */
+.reactions-container {
+    padding: 20px;
+    text-align: center;
+}
+
+.reaction-circles {
+    position: relative;
+    width: 200px;
+    margin: 0 auto 20px;
+}
+
+.circular-chart {
+    width: 100%;
+    height: auto;
+}
+
+.circle-bg {
+    fill: none;
+    stroke: #333;
+    stroke-width: 2;
+}
+
+.circle-like, .circle-dislike {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    animation: progress 1s ease-out forwards;
+}
+
+.reaction-stats {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.likes, .dislikes {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.likes span, .dislikes span {
+    font-size: 1.3rem;
+    font-weight: 600;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+.reaction-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+.btn-reaction {
+    background: #2c3e50;
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    font-size: 1.1rem;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+}
+
+.btn-reaction i {
+    font-size: 1.2rem;
+}
+
+.btn-reaction .reaction-count {
+    background: rgba(255,255,255,0.2);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.btn-reaction:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.btn-reaction.like.active {
+    background: #2ecc71;
+    box-shadow: 0 0 15px rgba(46,204,113,0.4);
+}
+
+.btn-reaction.dislike.active {
+    background: #e74c3c;
+    box-shadow: 0 0 15px rgba(231,76,60,0.4);
+}
+
+/* Maç Geçmişi Koyu Tema */
+.match-card {
+    background: linear-gradient(145deg, #2c2c2c, #222);
+    border: 1px solid #333;
+    color: #fff;
+}
+
+.match-win {
+    background: linear-gradient(145deg, rgba(46,204,113,0.2), rgba(46,204,113,0.1));
+}
+
+.match-draw {
+    background: linear-gradient(145deg, rgba(241,196,15,0.2), rgba(241,196,15,0.1));
+}
+
+.match-loss {
+    background: linear-gradient(145deg, rgba(231,76,60,0.2), rgba(231,76,60,0.1));
+}
+
+/* Yorumlar Koyu Tema */
+.comment-form {
+    background: #2c2c2c;
+}
+
+.comment-form textarea {
+    background: #333;
+    color: #fff;
+    border: 1px solid #444;
+}
+
+.comment-item {
+    background: linear-gradient(145deg, #2c2c2c, #222);
+    border: 1px solid #333;
+    color: #fff;
+}
+
+.admin-comment {
+    background: linear-gradient(145deg, rgba(52,152,219,0.2), rgba(52,152,219,0.1));
+    border: 1px solid rgba(52,152,219,0.3) !important;
+    box-shadow: 0 4px 15px rgba(52,152,219,0.1);
+}
+
+.admin-comment .commenter-name {
+    color: #3498db;
+    font-weight: 700;
+    text-shadow: 0 0 10px rgba(52,152,219,0.3);
+}
+
+.admin-comment .admin-badge {
+    color: #f1c40f;
+    margin-right: 5px;
+    font-size: 1.1rem;
+    animation: glow 2s ease-in-out infinite alternate;
+}
+
+.admin-comment .comment-content {
+    color: #fff;
+    font-weight: 500;
+}
+
+.admin-comment .comment-date {
+    color: rgba(255,255,255,0.8);
+}
+
+@keyframes glow {
+    from {
+        text-shadow: 0 0 5px #f1c40f, 0 0 10px #f1c40f;
+    }
+    to {
+        text-shadow: 0 0 10px #f1c40f, 0 0 20px #f1c40f;
+    }
+}
+
+/* Scrollbar Koyu Tema */
+.match-history::-webkit-scrollbar,
+.comments-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.match-history::-webkit-scrollbar-track,
+.comments-list::-webkit-scrollbar-track {
+    background: #222;
+}
+
+.match-history::-webkit-scrollbar-thumb,
+.comments-list::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 4px;
+}
+
+.match-history::-webkit-scrollbar-thumb:hover,
+.comments-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+@keyframes progress {
+    0% {
+        stroke-dasharray: 0 100;
+    }
+}
+
+/* Genel yazı stilleri */
+body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Koyu tema yazı renkleri ve kalınlıkları */
+.match-history-section, .comments-section, .reactions-section {
+    color: #fff;
+    font-weight: 400;
+    letter-spacing: 0.3px;
+}
+
+.section-title {
+    color: #fff;
+    font-weight: 600;
+    font-size: 1.3rem;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+}
+
+/* Beğeni sistemi güncellenmiş stiller */
+.reaction-stats {
+    background: rgba(0,0,0,0.2);
+    padding: 15px;
+    border-radius: 10px;
+    margin: 10px 0;
+}
+
+.likes span, .dislikes span {
+    font-size: 1.3rem;
+    font-weight: 600;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+.btn-reaction {
+    background: #2c3e50;
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    font-size: 1.1rem;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+}
+
+.btn-reaction i {
+    font-size: 1.2rem;
+}
+
+.btn-reaction .reaction-count {
+    background: rgba(255,255,255,0.2);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.btn-reaction:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.btn-reaction.like.active {
+    background: #2ecc71;
+    box-shadow: 0 0 15px rgba(46,204,113,0.4);
+}
+
+.btn-reaction.dislike.active {
+    background: #e74c3c;
+    box-shadow: 0 0 15px rgba(231,76,60,0.4);
+}
+
+/* Yorumlar bölümü yazı stilleri */
+.comment-item {
+    font-size: 1rem;
+    line-height: 1.6;
+}
+
+.commenter-name {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: #3498db;
+}
+
+.comment-content {
+    color: #ecf0f1;
+    font-weight: 400;
+    line-height: 1.6;
+}
+
+.comment-date {
+    color: #bdc3c7;
+    font-weight: 500;
+}
+
+/* Maç kartları yazı stilleri */
+.match-card {
+    font-weight: 500;
+}
+
+.match-score {
+    font-size: 1.6rem;
+    font-weight: 700;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+.badge {
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+}
+
+/* Form elemanları */
+.comment-form textarea {
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 400;
+    padding: 12px;
+}
+
+.comment-form textarea::placeholder {
+    color: rgba(255,255,255,0.6);
+}
+
+/* Maç Geçmişi Yazı Stilleri */
+.match-card {
+    font-weight: 500;
+    text-shadow: 0 0 10px rgba(255,255,255,0.1);
+}
+
+.match-header {
+    color: #fff !important;
+}
+
+.match-date, .match-location {
+    color: rgba(255,255,255,0.9) !important;
+    font-weight: 500;
+}
+
+.match-date i, .match-location i {
+    color: #3498db;
+    text-shadow: 0 0 10px rgba(52,152,219,0.3);
+}
+
+.match-score {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 0 15px rgba(255,255,255,0.2);
+}
+
+.score-divider {
+    color: rgba(255,255,255,0.7);
+}
+
+.badge {
+    font-weight: 600;
+    font-size: 1rem;
+    padding: 8px 15px;
+    text-shadow: none;
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+}
+
+.badge-success {
+    background: #2ecc71;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.badge-warning {
+    background: #f1c40f;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.badge-danger {
+    background: #e74c3c;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.payment-amount {
+    color: #fff;
+    font-weight: 600;
+}
+
+.payment-amount i {
+    color: #f1c40f;
+    text-shadow: 0 0 10px rgba(241,196,15,0.3);
+}
+
+/* Hover efektleri */
+.match-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.match-card:hover .match-score {
+    text-shadow: 0 0 20px rgba(255,255,255,0.3);
+}
+
+.match-card:hover .badge {
+    transform: scale(1.05);
+}
 </style>
 
 <script>
-// Mevcut JavaScript kodları aynı kalacak
-// Win Rate Chart ve diğer fonksiyonlar...
-
-// Yeni: Daire Progress Bar Animasyonu
-document.querySelectorAll('.circle-progress').forEach(circle => {
-    const value = circle.dataset.value;
-    circle.style.background = `conic-gradient(
-        #4CAF50 ${value * 3.6}deg,
-        rgba(255,255,255,0.1) ${value * 3.6}deg
-    )`;
-});
-
-async function handleReaction(type) {
+// Beğeni sistemi için güncellenmiş JavaScript
+async function react(type) {
     try {
-        const response = await fetch(`/api/players/{{ player._id }}/reaction`, {
+        const response = await fetch(`/api/players/{{ player._id }}/react`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify({
-                is_like: type === 'like'
-            }),
-            credentials: 'same-origin'
+            body: JSON.stringify({ reaction_type: type })
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Beğeni işlemi başarısız');
+            const errorData = await response.json();
+            if (response.status === 403) {
+                alert('Beğeni/beğenmeme için giriş yapmalısınız!');
+                return;
+            }
+            throw new Error(errorData.error || 'İşlem başarısız');
         }
 
         const data = await response.json();
-        
+        console.log("Beğeni yanıtı:", data);
+
         // Beğeni sayılarını güncelle
         document.getElementById('likes-count').textContent = data.likes;
         document.getElementById('dislikes-count').textContent = data.dislikes;
 
-        // Yüzdeleri hesapla ve güncelle
+        // Progress circle'ı güncelle
         const total = data.likes + data.dislikes;
         const likePercent = total > 0 ? (data.likes / total * 100) : 0;
         const dislikePercent = total > 0 ? (data.dislikes / total * 100) : 0;
-
-        // Yüzde metinlerini güncelle
-        document.getElementById('like-percent').textContent = `%${likePercent.toFixed(1)}`;
-        document.getElementById('dislike-percent').textContent = `%${dislikePercent.toFixed(1)}`;
 
         // SVG path'leri güncelle
         document.querySelector('.circle-like').setAttribute('stroke-dasharray', `${likePercent}, 100`);
         document.querySelector('.circle-dislike').setAttribute('stroke-dasharray', `${dislikePercent}, 100`);
         document.querySelector('.circle-dislike').setAttribute('transform', `rotate(${likePercent * 3.6} 18 18)`);
 
-        // Butonların active durumunu güncelle
-        document.querySelectorAll('.btn-reaction').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        
-        const activeBtn = document.querySelector(`.btn-reaction.${type}`);
-        if (activeBtn) {
-            activeBtn.classList.add('active');
+        // Yüzde metinlerini güncelle
+        document.querySelector('.like-percent').textContent = `%${likePercent.toFixed(1)}`;
+        document.querySelector('.dislike-percent').textContent = `%${dislikePercent.toFixed(1)}`;
+
+        // Butonların aktif durumunu güncelle
+        document.querySelectorAll('.btn-reaction').forEach(btn => btn.classList.remove('active'));
+        if (data.current_user_reaction === type) {
+            document.querySelector(`.btn-reaction:nth-child(${type === 'like' ? 1 : 2})`).classList.add('active');
         }
 
     } catch (error) {
         console.error('Beğeni hatası:', error);
-        alert(error.message);
+        alert('Bir hata oluştu: ' + error.message);
+    }
+}
+
+async function uploadAvatar(event) {
+    try {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Dosya tipi kontrolü
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Sadece JPG, JPEG ve PNG dosyaları yüklenebilir!');
+            return;
+        }
+
+        // FormData oluştur
+        const formData = new FormData();
+        formData.append('avatar', file);
+
+        // Yükleme başladı bildirimi
+        const avatarImg = document.getElementById('playerAvatar');
+        avatarImg.style.opacity = '0.5';
+
+        // Fotoğrafı yükle
+        const response = await fetch(`/api/players/{{ player._id }}/upload-avatar`, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Fotoğraf yüklenemedi');
+        }
+
+        // Başarılı yükleme
+        avatarImg.src = data.avatar_url;
+        avatarImg.style.opacity = '1';
+
+        // Önbelleği temizlemek için timestamp ekle
+        const timestamp = new Date().getTime();
+        avatarImg.src = `${data.avatar_url}?t=${timestamp}`;
+
+    } catch (error) {
+        console.error('Fotoğraf yükleme hatası:', error);
+        alert('Fotoğraf yüklenirken bir hata oluştu: ' + error.message);
+        
+        // Hata durumunda opacity'yi düzelt
+        const avatarImg = document.getElementById('playerAvatar');
+        avatarImg.style.opacity = '1';
     }
 }
 
 // Yorum gönderme fonksiyonu
-document.getElementById('commentForm')?.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const commentText = document.getElementById('commentText').value;
-    
-    if (!commentText.trim()) {
-        alert('Lütfen bir yorum yazın');
-        return;
-    }
+async function submitComment(event) {
+    event.preventDefault();
     
     try {
+        const commentText = document.getElementById('commentText').value.trim();
+        if (!commentText) {
+            alert('Lütfen bir yorum yazın!');
+            return;
+        }
+
         const response = await fetch(`/api/players/{{ player._id }}/comments`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify({
-                text: commentText
-            })
+            body: JSON.stringify({ text: commentText })
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Yorum gönderilemedi');
+            const data = await response.json();
+            throw new Error(data.error || 'Yorum gönderilemedi');
         }
 
         const data = await response.json();
         
         // Yeni yorumu listeye ekle
         const commentsList = document.getElementById('commentsList');
-        const commentHtml = `
-            <div class="comment-item ${data.is_admin ? 'admin-comment' : ''}">
+        const newComment = `
+            <div class="comment-item ${data.is_admin ? 'admin-comment' : ''}" data-id="${data._id}">
                 <div class="comment-header">
-                    ${data.is_admin ? '<i class="fas fa-shield-alt"></i>' : ''}
-                    <strong>${data.commenter_name}</strong>
-                    <small>${new Date(data.created_at).toLocaleString('tr-TR', {
-                        timeZone: 'Europe/Istanbul'
-                    })}</small>
+                    <div class="commenter-info">
+                        <div class="commenter-avatar">
+                            <img src="${data.commenter_avatar || '/static/img/default-avatar.png'}" 
+                                 alt="${data.commenter_name}"
+                                 onerror="this.src='https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'">
+                        </div>
+                        <div class="commenter-details">
+                            <div class="commenter-name">
+                                ${data.is_admin ? '<i class="fas fa-shield-alt admin-badge" title="Admin"></i>' : ''}
+                                ${data.commenter_name}
+                            </div>
+                            <div class="comment-date">
+                                ${new Date().toLocaleString('tr-TR')}
+                            </div>
+                        </div>
+                    </div>
+                    ${data.is_admin ? `
+                        <div class="comment-actions">
+                            <button class="btn btn-sm btn-danger" onclick="deleteComment('${data._id}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    ` : ''}
                 </div>
-                <p>${data.text}</p>
+                <div class="comment-content">${data.text}</div>
             </div>
         `;
-        commentsList.insertAdjacentHTML('afterbegin', commentHtml);
+        commentsList.insertAdjacentHTML('afterbegin', newComment);
         
         // Formu temizle
         document.getElementById('commentText').value = '';
 
     } catch (error) {
-        console.error('Yorum hatası:', error);
-        alert(error.message || 'Yorum gönderilemedi. Lütfen tekrar deneyin.');
-    }
-});
-
-// Yorum silme fonksiyonu (admin için)
-async function deleteComment(commentId) {
-    if (!confirm('Bu yorumu silmek istediğinize emin misiniz?')) {
-        return;
-    }
-
-    try {
-        const response = await fetch(`/api/players/{{ player._id }}/comments?comment_id=${commentId}`, {
-            method: 'DELETE',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error('Yorum silinemedi');
-        }
-
-        // Yorumu DOM'dan kaldır
-        document.querySelector(`.comment-item[data-id="${commentId}"]`).remove();
-
-    } catch (error) {
-        console.error('Yorum silme hatası:', error);
-        alert('Yorum silinemedi. Lütfen tekrar deneyin.');
-    }
-}
-
-// Admin beğeni düzenleme fonksiyonları
-function editLikes() {
-    if (!{{ 'true' if is_admin else 'false' }}) return;
-    
-    const currentLikes = parseInt(document.getElementById('likes-count').textContent);
-    const newLikes = prompt('Yeni beğeni sayısını girin:', currentLikes);
-    
-    if (newLikes !== null && !isNaN(newLikes)) {
-        updateReactionCounts(parseInt(newLikes), parseInt(document.getElementById('dislikes-count').textContent));
-    }
-}
-
-function editDislikes() {
-    if (!{{ 'true' if is_admin else 'false' }}) return;
-    
-    const currentDislikes = parseInt(document.getElementById('dislikes-count').textContent);
-    const newDislikes = prompt('Yeni beğenmeme sayısını girin:', currentDislikes);
-    
-    if (newDislikes !== null && !isNaN(newDislikes)) {
-        updateReactionCounts(parseInt(document.getElementById('likes-count').textContent), parseInt(newDislikes));
-    }
-}
-
-// TC güncelleme fonksiyonu
-async function updateTC(playerId) {
-    try {
-        const newTC = prompt('Yeni TC kimlik numarasını girin:');
-        if (!newTC) return;
-
-        const response = await fetch(`/api/players/${playerId}/update-tc`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify({
-                tc_no: newTC
-            })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            if (response.status === 403 && data.redirect_url) {
-                window.location.href = data.redirect_url;
-                return;
-            }
-            throw new Error(data.error || 'TC güncellenemedi');
-        }
-
-        alert('TC kimlik numarası başarıyla güncellendi');
-        location.reload();
-
-    } catch (error) {
-        console.error('TC güncelleme hatası:', error);
-        alert(error.message || 'TC güncellenemedi. Lütfen tekrar deneyin.');
-    }
-}
-
-// Reaksiyon güncelleme fonksiyonu
-async function updateReactionCounts(likes, dislikes) {
-    try {
-        const response = await fetch(`/api/players/{{ player._id }}/reactions/update`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify({
-                likes: likes,
-                dislikes: dislikes
-            })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            if (response.status === 403 && data.redirect_url) {
-                window.location.href = data.redirect_url;
-                return;
-            }
-            throw new Error(data.error || 'Beğeni sayıları güncellenemedi');
-        }
-
-        // UI güncelleme
-        document.getElementById('likes-count').textContent = data.likes;
-        document.getElementById('dislikes-count').textContent = data.dislikes;
-
-        // Yüzdeleri güncelle
-        const total = data.likes + data.dislikes;
-        const likePercent = total > 0 ? (data.likes / total * 100) : 0;
-        const dislikePercent = total > 0 ? (data.dislikes / total * 100) : 0;
-
-        document.getElementById('like-percent').textContent = `%${likePercent.toFixed(1)}`;
-        document.getElementById('dislike-percent').textContent = `%${dislikePercent.toFixed(1)}`;
-
-        // SVG path'leri güncelle
-        document.querySelector('.circle-like').setAttribute('stroke-dasharray', `${likePercent}, 100`);
-        document.querySelector('.circle-dislike').setAttribute('stroke-dasharray', `${dislikePercent}, 100`);
-        document.querySelector('.circle-dislike').setAttribute('transform', `rotate(${likePercent * 3.6} 18 18)`);
-
-    } catch (error) {
-        console.error('Güncelleme hatası:', error);
-        alert(error.message || 'Beğeni sayıları güncellenemedi. Lütfen tekrar deneyin.');
-    }
-}
-
-// Fotoğraf yükleme işlemi
-async function uploadAvatar(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    // Yükleme başladığında loading göster
-    const avatarImg = document.getElementById('playerAvatar');
-    const originalSrc = avatarImg.src;
-    avatarImg.style.opacity = '0.5';
-
-    const formData = new FormData();
-    formData.append('avatar', file);
-
-    try {
-        const playerId = '{{ player._id }}';
-        console.log('Uploading avatar for player:', playerId);  // Debug için
-
-        const response = await fetch(`/api/players/${playerId}/upload-avatar`, {
-            method: 'POST',
-            body: formData,
-            credentials: 'include'
-        });
-
-        const data = await response.json();
-        console.log('Server response:', data);  // Debug için
-
-        if (!response.ok) {
-            throw new Error(data.error || 'Fotoğraf yüklenemedi');
-        }
-
-        // Yükleme başarılı olduğunda yeni fotoğrafı göster
-        avatarImg.src = data.avatar_url;
-        avatarImg.style.opacity = '1';
-        alert('Fotoğraf başarıyla yüklendi!');
-
-    } catch (error) {
-        console.error('Fotoğraf yükleme hatası:', error);
-        alert(error.message || 'Fotoğraf yüklenemedi. Lütfen tekrar deneyin.');
-        avatarImg.src = originalSrc;
-        avatarImg.style.opacity = '1';
+        console.error('Yorum gönderme hatası:', error);
+        alert('Yorum gönderilirken bir hata oluştu: ' + error.message);
     }
 }
 </script>
