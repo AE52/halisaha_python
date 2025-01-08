@@ -7,10 +7,42 @@ from config import Config
 client = MongoClient(Config.MONGO_URI)
 db = client[Config.MONGO_DB]
 
-# Koleksiyonlar
-players = db.players
-matches = db.matches
-reactions = db.reactions
+# Koleksiyonları tanımla ve kontrol et
+def init_db():
+    try:
+        # Koleksiyonları oluştur (yoksa)
+        if 'players' not in db.list_collection_names():
+            db.create_collection('players')
+        if 'matches' not in db.list_collection_names():
+            db.create_collection('matches')
+        if 'reactions' not in db.list_collection_names():
+            db.create_collection('reactions')
+        if 'comments' not in db.list_collection_names():
+            db.create_collection('comments')
+            
+        # Koleksiyonları tanımla
+        global players, matches, reactions, comments
+        players = db.players
+        matches = db.matches
+        reactions = db.reactions
+        comments = db.comments
+        
+        # Bağlantıyı test et
+        db.command('ping')
+        print("MongoDB bağlantısı ve koleksiyonlar hazır!")
+        
+        # Mevcut verileri kontrol et
+        player_count = players.count_documents({})
+        match_count = matches.count_documents({})
+        print(f"Mevcut oyuncu sayısı: {player_count}")
+        print(f"Mevcut maç sayısı: {match_count}")
+        
+    except Exception as e:
+        print(f"Veritabanı başlatma hatası: {str(e)}")
+        raise e
+
+# Veritabanını başlat
+init_db()
 
 # Admin API key
 API_KEY = "AE52YAPAR"
@@ -19,54 +51,54 @@ class Player:
     @staticmethod
     def get_by_id(id):
         try:
-            # ID string olarak geliyor
-            player = players.find_one({"_id": str(id)})
+            # ID tipini kontrol et ve dönüştür
+            if isinstance(id, str):
+                # Önce integer'a çevirmeyi dene
+                try:
+                    query_id = int(id)
+                except ValueError:
+                    # Integer'a çevrilemiyorsa ObjectId olabilir
+                    if ObjectId.is_valid(id):
+                        query_id = ObjectId(id)
+                    else:
+                        print(f"Geçersiz ID formatı: {id}")
+                        return None
+            else:
+                query_id = id
+
+            # Debug için
+            print(f"Aranıyor: {query_id} (type: {type(query_id)})")
+            
+            # Hem integer hem ObjectId ile ara
+            player = players.find_one({"$or": [
+                {"_id": query_id},
+                {"_id": str(query_id)}
+            ]})
+
             if player:
-                # Temel oyuncu bilgileri
-                player_data = {
-                    '_id': str(player['_id']),
-                    'name': player.get('name', 'İsimsiz'),
-                    'tc_no': player.get('tc_no', ''),
-                    'position': player.get('position', 'Belirsiz'),
-                    'stats': player.get('stats', {
-                        'pace': 70,
-                        'shooting': 70,
-                        'passing': 70,
-                        'dribbling': 70,
-                        'defending': 70,
-                        'physical': 70
-                    }),
-                    'is_active': player.get('is_active', True),
-                    'created_at': player.get('created_at', datetime.now())
-                }
-
-                # Overall değerini hesapla
-                weights = {
-                    'Kaleci': {'pace': 0.1, 'shooting': 0, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.4, 'physical': 0.2},
-                    'Defans': {'pace': 0.2, 'shooting': 0.1, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.3, 'physical': 0.1},
-                    'Orta Saha': {'pace': 0.15, 'shooting': 0.2, 'passing': 0.25, 'dribbling': 0.2, 'defending': 0.1, 'physical': 0.1},
-                    'Forvet': {'pace': 0.2, 'shooting': 0.3, 'passing': 0.15, 'dribbling': 0.2, 'defending': 0.05, 'physical': 0.1}
-                }
+                # ID'yi string'e çevir
+                player['_id'] = str(player['_id'])
                 
-                w = weights.get(player_data['position'], weights['Orta Saha'])
-                player_data['overall'] = int(
-                    player_data['stats']['pace'] * w['pace'] +
-                    player_data['stats']['shooting'] * w['shooting'] +
-                    player_data['stats']['passing'] * w['passing'] +
-                    player_data['stats']['dribbling'] * w['dribbling'] +
-                    player_data['stats']['defending'] * w['defending'] +
-                    player_data['stats']['physical'] * w['physical']
-                )
-
-                # Maç istatistiklerini ekle
-                match_stats = Player.get_player_stats(str(player['_id']))
-                if match_stats:
-                    player_data['match_stats'] = match_stats
-
-                return player_data
+                # Varsayılan değerleri ekle
+                player.setdefault('stats', {
+                    'pace': 70,
+                    'shooting': 70,
+                    'passing': 70,
+                    'dribbling': 70,
+                    'defending': 70,
+                    'physical': 70
+                })
+                player.setdefault('position', 'Orta Saha')
+                player.setdefault('overall', calculate_overall(player['stats'], player['position']))
+                
+                print(f"Oyuncu bulundu: {player['name']}")
+                return player
+                
+            print(f"Oyuncu bulunamadı: {query_id}")
             return None
+            
         except Exception as e:
-            print(f"ID ile oyuncu arama hatası: {str(e)}")
+            print(f"Oyuncu getirme hatası: {str(e)}")
             return None
 
     @staticmethod
@@ -295,6 +327,43 @@ class Player:
             print(f"Beğeni ekleme/güncelleme hatası: {str(e)}")
             return False
 
+    @staticmethod
+    def update_avatar(player_id, cloudinary_result):
+        try:
+            print(f"Avatar güncelleniyor - ID: {player_id}, Type: {type(player_id)}")
+            
+            # Önce mevcut oyuncuyu bul
+            player = players.find_one({"$or": [
+                {"_id": player_id},
+                {"_id": str(player_id)},
+                {"_id": int(player_id) if str(player_id).isdigit() else None},
+                {"_id": ObjectId(player_id) if ObjectId.is_valid(player_id) else None}
+            ]})
+            
+            if not player:
+                print(f"Oyuncu bulunamadı: {player_id}")
+                return False
+            
+            print(f"Oyuncu bulundu: {player.get('name')}, ID: {player['_id']}")
+            
+            # Veritabanını güncelle - bulunan oyuncunun ID'sini kullan
+            update_result = players.update_one(
+                {"_id": player["_id"]},  # Bulunan oyuncunun orijinal ID'sini kullan
+                {"$set": {
+                    "avatar_url": cloudinary_result['secure_url'],
+                    "avatar_public_id": cloudinary_result['public_id'],
+                    "updated_at": datetime.now(timezone.utc)
+                }}
+            )
+            
+            success = update_result.modified_count > 0
+            print(f"Güncelleme sonucu: {success}")
+            return success
+            
+        except Exception as e:
+            print(f"Avatar güncelleme hatası: {str(e)}")
+            return False
+
 class Match:
     @staticmethod
     def get_all():
@@ -331,32 +400,37 @@ class Match:
     @staticmethod
     def get_by_id(id):
         try:
-            # ID string olarak geliyor
-            match = matches.find_one({"_id": str(id)})
+            # ID string veya int olabilir
+            if isinstance(id, str):
+                try:
+                    id = int(id)
+                except ValueError:
+                    if ObjectId.is_valid(id):
+                        id = ObjectId(id)
+                    else:
+                        return None
+            
+            match = matches.find_one({"_id": id})
             if match:
                 match['_id'] = str(match['_id'])
-                # Her oyuncu için bilgileri al
+                
+                # Her takımdaki oyuncular için bilgileri al
                 for team in ['a', 'b']:
                     for player in match['teams'][team]:
                         player_info = Player.get_by_id(player['player_id'])
                         if player_info:
-                            # Oyuncu bilgilerini güncelle
-                            stats = player_info.get('stats', {
-                                'pace': 70,
-                                'shooting': 70,
-                                'passing': 70,
-                                'dribbling': 70,
-                                'defending': 70,
-                                'physical': 70
-                            })
-                            
-                            position = player_info.get('position', 'Orta Saha')
-                            
                             player.update({
                                 'name': player_info.get('name', 'İsimsiz'),
-                                'position': position,
-                                'stats': stats,
-                                'overall': calculate_overall(stats, position)
+                                'position': player_info.get('position', 'Belirsiz'),
+                                'stats': player_info.get('stats', {
+                                    'pace': 70,
+                                    'shooting': 70,
+                                    'passing': 70,
+                                    'dribbling': 70,
+                                    'defending': 70,
+                                    'physical': 70
+                                }),
+                                'overall': player_info.get('overall', 70)
                             })
                 return match
             return None

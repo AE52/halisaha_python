@@ -71,15 +71,23 @@
                 <div class="card-header">
                     <div class="player-info">
                         <div class="player-avatar">
-                            <img src="{{ player.avatar_url|default('/static/img/default-avatar.png') }}" alt="{{ player.name }}">
+                            <img src="{{ player.avatar_url|default('/static/img/default-avatar.png') }}" alt="{{ player.name }}" id="playerAvatar"
+                                 onerror="this.src='https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'">
+                            {% if is_admin %}
+                            <div class="avatar-upload">
+                                <label for="avatarInput" class="btn btn-primary">
+                                    <i class="fas fa-camera"></i> Fotoğraf Yükle
+                                </label>
+                                <input type="file" id="avatarInput" style="display: none" accept="image/*" onchange="uploadAvatar(event)">
+                            </div>
+                            {% endif %}
                         </div>
                         <h2 class="player-name">{{ player.name }}</h2>
                         <div class="player-meta">
-                            <span class="position-badge">{{ player.position }}</span>
-                            <span class="nationality">
-                                <img src="/static/img/flags/tr.png" alt="TR" class="flag-icon">
-                                Türkiye
+                            <span class="country-flag">
+                                {{ country_to_flag_emoji('TR') }}
                             </span>
+                            <span>{{ player.name }}</span>
                         </div>
                     </div>
                     <div class="overall-rating">
@@ -334,12 +342,10 @@
 }
 
 .player-avatar {
+    position: relative;
     width: 120px;
     height: 120px;
-    border-radius: 60px;
-    margin: 0 auto 15px;
-    overflow: hidden;
-    border: 3px solid rgba(255,255,255,0.3);
+    margin: 0 auto;
 }
 
 .player-avatar img {
@@ -844,6 +850,30 @@
     background: #dc3545;
     color: white;
 }
+
+/* Avatar yükleme butonu stilleri */
+.player-avatar {
+    position: relative;
+}
+
+.avatar-upload {
+    position: absolute;
+    bottom: -10px;
+    right: -10px;
+    z-index: 10;
+}
+
+.avatar-upload label {
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.avatar-upload label:hover {
+    background-color: #0056b3;
+}
 </style>
 
 <script>
@@ -1101,6 +1131,49 @@ async function updateReactionCounts(likes, dislikes) {
     } catch (error) {
         console.error('Güncelleme hatası:', error);
         alert(error.message || 'Beğeni sayıları güncellenemedi. Lütfen tekrar deneyin.');
+    }
+}
+
+// Fotoğraf yükleme işlemi
+async function uploadAvatar(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Yükleme başladığında loading göster
+    const avatarImg = document.getElementById('playerAvatar');
+    const originalSrc = avatarImg.src;
+    avatarImg.style.opacity = '0.5';
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    try {
+        const playerId = '{{ player._id }}';
+        console.log('Uploading avatar for player:', playerId);  // Debug için
+
+        const response = await fetch(`/api/players/${playerId}/upload-avatar`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+        });
+
+        const data = await response.json();
+        console.log('Server response:', data);  // Debug için
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Fotoğraf yüklenemedi');
+        }
+
+        // Yükleme başarılı olduğunda yeni fotoğrafı göster
+        avatarImg.src = data.avatar_url;
+        avatarImg.style.opacity = '1';
+        alert('Fotoğraf başarıyla yüklendi!');
+
+    } catch (error) {
+        console.error('Fotoğraf yükleme hatası:', error);
+        alert(error.message || 'Fotoğraf yüklenemedi. Lütfen tekrar deneyin.');
+        avatarImg.src = originalSrc;
+        avatarImg.style.opacity = '1';
     }
 }
 </script>

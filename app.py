@@ -9,6 +9,12 @@ from pymongo import MongoClient
 import os
 from bson import ObjectId
 import pytz  # Ekleyin
+from werkzeug.utils import secure_filename
+import time
+import cloudinary
+import cloudinary.uploader
+import shutil
+import requests
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -26,8 +32,7 @@ client = MongoClient(
 
 # Veritabanı ve koleksiyonları tanımla
 db = client[Config.MONGO_DB]
-matches = db.matches
-players = db.players
+players_collection = db.players  # players yerine players_collection kullan
 reactions = db.reactions  # Reaksiyonlar için koleksiyon
 comments = db.comments  # Yorum koleksiyonunu ekle
 
@@ -268,6 +273,17 @@ def get_turkey_time(utc_time=None):
         utc_time = pytz.utc.localize(utc_time)
     return utc_time.astimezone(turkey_tz)
 
+def country_to_flag_emoji(country_code):
+    """Ülke kodunu bayrak emojisine çevirir"""
+    if not country_code:
+        return "🏳️"
+        
+    # Ülke kodunu büyük harfe çevir
+    country_code = country_code.upper()
+    
+    # Regional Indicator Symbols'a çevir
+    return "".join([chr(ord(c) + 127397) for c in country_code])
+
 @app.context_processor
 def utility_processor():
     def get_player_info(player_id):
@@ -298,7 +314,8 @@ def utility_processor():
         get_player_card_class=get_player_card_class,
         get_stat_class=get_stat_class,
         get_player_info=get_player_info,
-        get_turkey_time=get_turkey_time
+        get_turkey_time=get_turkey_time,
+        country_to_flag_emoji=country_to_flag_emoji
     )
 
 def get_stat_class(value):
@@ -345,7 +362,7 @@ def add_player_api():
         }
         
         # Oyuncuyu ekle
-        players.insert_one(player_data)
+        players_collection.insert_one(player_data)
         return jsonify({"success": True, "message": get_translation('player_added')})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 400
@@ -635,42 +652,51 @@ def toggle_payment_status(match_id, player_id):
 @app.route('/players/<id>')
 def player_profile(id):
     try:
+        # Debug için
+        print(f"Gelen oyuncu ID: {id}")
+        
+        # Oyuncuyu bul
         player = Player.get_by_id(id)
         if not player:
             return render_template('404.html',
-                                error_message=f"Oyuncu bulunamadı (ID: {id})",
-                                error_details="Oyuncu silinmiş veya ID hatalı olabilir."), 404
+                                error_message="Oyuncu bulunamadı",
+                                error_details=f"ID: {id}"), 404
 
         # Beğeni/beğenmeme sayılarını al
-        reactions = Player.get_reactions(id)
-        total_reactions = reactions['likes'] + reactions['dislikes']
+        reaction_data = reactions.find_one({"player_id": str(player['_id'])}) or {"likes": 0, "dislikes": 0}
         
-        # Yüzdeleri hesapla
-        like_percent = (reactions['likes'] / total_reactions * 100) if total_reactions > 0 else 0
-        dislike_percent = (reactions['dislikes'] / total_reactions * 100) if total_reactions > 0 else 0
-
-        # Mevcut kullanıcının beğeni durumunu kontrol et
-        current_user_reaction = None
-        if 'player_id' in session:
-            current_user_reaction = Player.get_user_reaction(id, session['player_id'])
-
         # Yorumları al
-        comments = list(db.comments.find({"player_id": id}).sort("created_at", -1))
+        player_comments = list(comments.find({"player_id": str(player['_id'])}).sort("created_at", -1))
+        
+        # Maç istatistiklerini al
+        match_stats = Player.get_player_stats(str(player['_id']))
 
         return render_template('player_profile.html',
-                             player=player,
-                             stats=player.get('match_stats', {}),
-                             like_count=reactions['likes'],
-                             dislike_count=reactions['dislikes'],
-                             like_percent=like_percent,
-                             dislike_percent=dislike_percent,
-                             current_user_reaction=current_user_reaction,
-                             comments=comments)
+                            player=player,
+                            stats=match_stats or {},
+                            like_count=reaction_data.get('likes', 0),
+                            dislike_count=reaction_data.get('dislikes', 0),
+                            like_percent=calculate_like_percent(reaction_data),
+                            dislike_percent=calculate_dislike_percent(reaction_data),
+                            comments=player_comments)
+
     except Exception as e:
         print(f"Oyuncu profili hatası: {str(e)}")
         return render_template('404.html',
-                             error_message="Oyuncu profili görüntülenirken bir hata oluştu",
-                             error_details=str(e)), 404
+                            error_message="Oyuncu profili yüklenirken hata oluştu",
+                            error_details=str(e)), 404
+
+def calculate_like_percent(reaction_data):
+    total = reaction_data.get('likes', 0) + reaction_data.get('dislikes', 0)
+    if total == 0:
+        return 0
+    return (reaction_data.get('likes', 0) / total) * 100
+
+def calculate_dislike_percent(reaction_data):
+    total = reaction_data.get('likes', 0) + reaction_data.get('dislikes', 0)
+    if total == 0:
+        return 0
+    return (reaction_data.get('dislikes', 0) / total) * 100
 
 @app.route('/new-match', methods=['GET'])
 @admin_required
@@ -1018,8 +1044,8 @@ def match_detail(id):
         
         if not match:
             return render_template('404.html',
-                                error_message=f"Maç bulunamadı (ID: {id})",
-                                error_details="Maç silinmiş veya ID hatalı olabilir."), 404
+                                error_message="Maç bulunamadı",
+                                error_details=f"ID: {id}"), 404
         
         # Token varsa doğrula
         if is_admin:
@@ -1027,7 +1053,7 @@ def match_detail(id):
                 jwt.decode(request.cookies.get('jwt_token'), 
                          app.config['SECRET_KEY'], 
                          algorithms=["HS256"])
-            except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+            except:
                 is_admin = False
                 response = make_response(render_template('match_detail.html', 
                                                       match=match,
@@ -1039,6 +1065,7 @@ def match_detail(id):
                              match=match,
                              is_admin=is_admin)
     except Exception as e:
+        print(f"Maç detay hatası: {str(e)}")
         return render_template('404.html',
                              error_message="Maç detayı görüntülenirken bir hata oluştu",
                              error_details=str(e)), 404
@@ -1143,7 +1170,7 @@ def update_player_tc(id):
         if not new_tc:
             return jsonify({"error": "TC kimlik numarası gerekli"}), 400
             
-        result = players.update_one(
+        result = players_collection.update_one(
             {"_id": ObjectId(id)},
             {"$set": {"tc_no": new_tc}}
         )
@@ -1195,6 +1222,206 @@ def serve_images(filename):
         elif filename.startswith('flags/'):
             return send_from_directory('static/img', 'placeholder-flag.png')
         return '', 404
+
+# Dosya yükleme ayarları
+UPLOAD_FOLDER = os.path.join('static', 'uploads', 'avatars')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max-size
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
+
+# Dosya uzantı kontrolü
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# Cloudinary konfigürasyonu
+cloudinary.config(
+    cloud_name=Config.CLOUDINARY_CLOUD_NAME,
+    api_key=Config.CLOUDINARY_API_KEY,
+    api_secret=Config.CLOUDINARY_API_SECRET
+)
+
+# Fotoğraf yükleme endpoint'i
+@app.route('/api/players/<id>/upload-avatar', methods=['POST'])
+@admin_required
+def upload_avatar(id):
+    try:
+        print(f"Fotoğraf yükleme başladı - ID: {id}")
+        
+        # Oyuncuyu bul
+        player = Player.get_by_id(id)
+        if not player:
+            print(f"Oyuncu bulunamadı: {id}")
+            return jsonify({"error": "Oyuncu bulunamadı"}), 404
+
+        print(f"Oyuncu bulundu: {player.get('name')}, ID: {player['_id']}")
+
+        if 'avatar' not in request.files:
+            return jsonify({"error": "Dosya seçilmedi"}), 400
+            
+        file = request.files['avatar']
+        if file.filename == '':
+            return jsonify({"error": "Dosya seçilmedi"}), 400
+            
+        if file and allowed_file(file.filename):
+            try:
+                # Eski avatarı sil
+                if player.get('avatar_public_id'):
+                    try:
+                        print(f"Eski avatar siliniyor: {player['avatar_public_id']}")
+                        cloudinary.uploader.destroy(player['avatar_public_id'])
+                    except Exception as e:
+                        print(f"Eski fotoğraf silinirken hata: {str(e)}")
+                
+                # Yeni fotoğrafı yükle
+                timestamp = int(time.time())
+                player_id = player['_id']  # Bulunan oyuncunun ID'sini kullan
+                upload_path = f"avatars/player_{player_id}_{timestamp}"
+                print(f"Yeni fotoğraf yükleniyor: {upload_path}")
+                
+                result = cloudinary.uploader.upload(
+                    file,
+                    folder="avatars",
+                    public_id=f"player_{player_id}_{timestamp}",
+                    overwrite=True,
+                    resource_type="image"
+                )
+                
+                print(f"Cloudinary yanıtı: {result}")
+                
+                # Veritabanını güncelle - bulunan oyuncunun ID'sini kullan
+                if Player.update_avatar(player_id, result):
+                    return jsonify({
+                        "success": True,
+                        "avatar_url": result['secure_url']
+                    })
+                else:
+                    print("Veritabanı güncellenemedi")
+                    # Yüklenen fotoğrafı sil
+                    cloudinary.uploader.destroy(result['public_id'])
+                    return jsonify({"error": "Veritabanı güncellenemedi"}), 500
+                    
+            except Exception as e:
+                print(f"Fotoğraf yükleme hatası: {str(e)}")
+                return jsonify({"error": "Fotoğraf yüklenemedi"}), 500
+            
+        return jsonify({"error": "Geçersiz dosya türü"}), 400
+        
+    except Exception as e:
+        print(f"Fotoğraf yükleme hatası: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+# Varsayılan avatar'ı indir ve kaydet
+def setup_default_avatar():
+    default_avatar_path = 'static/img/default-avatar.png'
+    if not os.path.exists(default_avatar_path):
+        try:
+            # Klasörü oluştur
+            os.makedirs(os.path.dirname(default_avatar_path), exist_ok=True)
+            
+            # Varsayılan avatar URL'si
+            url = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"
+            response = requests.get(url, stream=True)
+            
+            if response.ok:  # status_ok yerine ok kullan
+                with open(default_avatar_path, 'wb') as out_file:
+                    shutil.copyfileobj(response.raw, out_file)
+                print("Varsayılan avatar indirildi")
+            else:
+                print(f"Avatar indirilemedi: {response.status_code}")
+                
+        except Exception as e:
+            print(f"Varsayılan avatar indirme hatası: {str(e)}")
+
+# Uygulama başlatılırken çağır
+setup_default_avatar()
+
+@app.route('/api/debug/db-status')
+@admin_required
+def db_status():
+    try:
+        status = {
+            "players": [],
+            "matches": [],
+            "collections": db.list_collection_names()
+        }
+        
+        # Oyuncuları listele
+        for player in players_collection.find():
+            status["players"].append({
+                "_id": str(player["_id"]),
+                "name": player.get("name"),
+                "id_type": type(player["_id"]).__name__
+            })
+            
+        # Maçları listele
+        for match in matches.find():
+            status["matches"].append({
+                "_id": str(match["_id"]),
+                "date": match.get("date"),
+                "id_type": type(match["_id"]).__name__
+            })
+            
+        return jsonify(status)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/debug/fix-db')
+@admin_required
+def fix_database():
+    try:
+        result = {
+            "fixed_players": 0,
+            "fixed_matches": 0,
+            "errors": []
+        }
+        
+        # Oyuncuları düzelt
+        for player in players_collection.find():
+            try:
+                # ID'yi integer'a çevir
+                if isinstance(player['_id'], str):
+                    new_id = int(player['_id'])
+                    players_collection.update_one(
+                        {"_id": player['_id']},
+                        {"$set": {"_id": new_id}}
+                    )
+                    result["fixed_players"] += 1
+                
+                # Avatar URL'sini kontrol et
+                if player.get('avatar_url') and not player.get('avatar_public_id'):
+                    # Cloudinary'den public_id çıkar
+                    try:
+                        public_id = player['avatar_url'].split('/')[-1].split('.')[0]
+                        players_collection.update_one(
+                            {"_id": player['_id']},
+                            {"$set": {"avatar_public_id": f"avatars/{public_id}"}}
+                        )
+                    except Exception as e:
+                        result["errors"].append(f"Avatar fix error for player {player['_id']}: {str(e)}")
+                
+            except Exception as e:
+                result["errors"].append(f"Player fix error {player['_id']}: {str(e)}")
+        
+        # Maçları düzelt
+        for match in matches.find():
+            try:
+                if isinstance(match['_id'], str):
+                    new_id = int(match['_id'])
+                    matches.update_one(
+                        {"_id": match['_id']},
+                        {"$set": {"_id": new_id}}
+                    )
+                    result["fixed_matches"] += 1
+            except Exception as e:
+                result["errors"].append(f"Match fix error {match['_id']}: {str(e)}")
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080))) 
