@@ -4,17 +4,18 @@ FROM python:3.9-slim
 # Çalışma dizinini ayarla
 WORKDIR /app
 
+# Environment variables
+ENV PORT=8080
+ENV MONGO_URI="mongodb+srv://ae52:Erenemir1comehacker@cluster0.y5nv8.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+ENV MONGO_DB="halisaha_db"
+ENV SECRET_KEY="gizli-anahtar-123"
+
 # Sistem bağımlılıklarını yükle
 RUN apt-get update && apt-get install -y \
     curl \
     python3-dev \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
-
-# Environment variables
-ENV PORT=8080
-ENV MONGO_URI="mongodb+srv://ae52:Erenemir1comehacker@cluster0.y5nv8.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-ENV MONGO_DB="halisaha_db"
 
 # Python bağımlılıklarını kopyala ve yükle
 COPY requirements.txt .
