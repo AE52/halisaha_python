@@ -50,3 +50,17 @@ CMD exec gunicorn --bind :$PORT \
     --error-logfile - \
     --log-level info \
     app:app 
+
+# MongoDB bağlantısı için gerekli paketleri ekleyelim
+RUN apt-get update && apt-get install -y \
+    python3-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# MongoDB sertifikalarını ekleyelim  
+RUN mkdir -p /etc/ssl/certs
+COPY certificates/mongodb.crt /etc/ssl/certs/
+
+# Environment variables
+ENV MONGO_URI="mongodb+srv://ae52:Erenemir1comehacker@cluster0.y5nv8.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+ENV DB_NAME="halisaha_db" 

@@ -5,7 +5,7 @@ from config import Config
 
 # MongoDB bağlantısı
 client = MongoClient(Config.MONGO_URI)
-db = client[Config.DB_NAME]
+db = client[Config.MONGO_DB]
 
 # Koleksiyonlar
 players = db.players
@@ -136,7 +136,20 @@ class Player:
 class Match:
     @staticmethod
     def get_by_id(id):
-        return matches.find_one({"_id": str(id)})
+        try:
+            print(f"Maç aranıyor. ID: {id}")  # Debug log
+            # ID string olarak geldiğinden direkt olarak kullan
+            match = matches.find_one({"_id": str(id)})
+            
+            if match:
+                print(f"Maç bulundu: {match}")  # Debug log
+                return match
+                
+            print(f"Maç bulunamadı. ID: {id}")  # Debug log
+            return None
+        except Exception as e:
+            print(f"Maç getirme hatası: {str(e)}")  # Debug log
+            return None
     
     @staticmethod
     def get_all():
@@ -144,10 +157,20 @@ class Match:
     
     @staticmethod
     def create(match_data):
-        match_data["_id"] = str(ObjectId())
-        match_data["created_at"] = datetime.now(timezone.utc)
-        matches.insert_one(match_data)
-        return match_data["_id"]
+        try:
+            # ObjectId oluştur
+            match_id = ObjectId()
+            match_data["_id"] = match_id
+            match_data["created_at"] = datetime.now(timezone.utc)
+            
+            # MongoDB'ye kaydet
+            matches.insert_one(match_data)
+            
+            # String olarak ID'yi döndür
+            return str(match_id)
+        except Exception as e:
+            print(f"Maç oluşturma hatası: {str(e)}")
+            return None
 
     @staticmethod
     def update(id, update_data):
@@ -179,73 +202,80 @@ class Match:
 
     @staticmethod
     def get_player_stats(player_id):
-        # Oyuncunun tüm maçlarını bul
-        pipeline = [
-            {
-                "$match": {
-                    "$or": [
-                        {"teams.a.player_id": str(player_id)},
-                        {"teams.b.player_id": str(player_id)}
-                    ]
+        try:
+            # Oyuncunun tüm maçlarını bul
+            pipeline = [
+                {
+                    "$match": {
+                        "$or": [
+                            {"teams.a.player_id": str(player_id)},
+                            {"teams.b.player_id": str(player_id)}
+                        ]
+                    }
                 }
-            }
-        ]
-        player_matches = list(matches.aggregate(pipeline))
-        
-        total_matches = len(player_matches)
-        wins = 0
-        draws = 0
-        match_history = []
-        
-        for match in player_matches:
-            # Oyuncunun hangi takımda olduğunu bul
-            team = 'a' if any(p['player_id'] == str(player_id) for p in match['teams']['a']) else 'b'
-            other_team = 'b' if team == 'a' else 'a'
+            ]
+            player_matches = list(matches.aggregate(pipeline))
+            print(f"Oyuncunun maçları: {player_matches}")  # Debug log
             
-            is_winner = False
-            is_draw = False
+            total_matches = len(player_matches)
+            wins = 0
+            draws = 0
+            match_history = []
             
-            if match['score'].get('team_a') is not None and match['score'].get('team_b') is not None:
-                if match['score']['team_a'] == match['score']['team_b']:
-                    is_draw = True
-                    draws += 1
-                else:
-                    if team == 'a':
-                        is_winner = match['score']['team_a'] > match['score']['team_b']
+            for match in player_matches:
+                # Oyuncunun hangi takımda olduğunu bul
+                team = 'a' if any(p['player_id'] == str(player_id) for p in match['teams']['a']) else 'b'
+                
+                is_winner = False
+                is_draw = False
+                
+                if match['score'].get('team_a') is not None and match['score'].get('team_b') is not None:
+                    if match['score']['team_a'] == match['score']['team_b']:
+                        is_draw = True
+                        draws += 1
                     else:
-                        is_winner = match['score']['team_b'] > match['score']['team_a']
-                    
-                    if is_winner:
-                        wins += 1
+                        if team == 'a':
+                            is_winner = match['score']['team_a'] > match['score']['team_b']
+                        else:
+                            is_winner = match['score']['team_b'] > match['score']['team_a']
+                        
+                        if is_winner:
+                            wins += 1
+                
+                # Oyuncunun ödeme durumunu bul
+                player_info = next(p for p in match['teams'][team] if p['player_id'] == str(player_id))
+                
+                # MongoDB ObjectId'yi string'e çevir
+                match_id = str(match['_id'])
+                
+                match_history.append({
+                    'match_id': match_id,
+                    'date': match['date'],
+                    'location': match['location'],
+                    'score_team_a': match['score'].get('team_a'),
+                    'score_team_b': match['score'].get('team_b'),
+                    'is_winner': is_winner,
+                    'is_draw': is_draw,
+                    'has_paid': player_info['has_paid'],
+                    'payment_amount': player_info['payment_amount']
+                })
             
-            # Oyuncunun ödeme durumunu bul
-            player_info = next(p for p in match['teams'][team] if p['player_id'] == str(player_id))
+            # Ödeme istatistiklerini hesapla
+            payment_stats = {
+                'total_debt': "{:.2f}".format(sum(m['payment_amount'] for m in match_history)),
+                'total_paid': "{:.2f}".format(sum(m['payment_amount'] for m in match_history if m['has_paid'])),
+                'remaining': "{:.2f}".format(sum(m['payment_amount'] for m in match_history if not m['has_paid']))
+            }
             
-            match_history.append({
-                'match_id': match['_id'],
-                'date': match['date'],
-                'location': match['location'],
-                'score_team_a': match['score'].get('team_a'),
-                'score_team_b': match['score'].get('team_b'),
-                'is_winner': is_winner,
-                'is_draw': is_draw,
-                'has_paid': player_info['has_paid'],
-                'payment_amount': player_info['payment_amount']
-            })
-        
-        # Ödeme istatistiklerini hesapla
-        payment_stats = {
-            'total_debt': "{:.2f}".format(sum(m['payment_amount'] for m in match_history)),
-            'total_paid': "{:.2f}".format(sum(m['payment_amount'] for m in match_history if m['has_paid'])),
-            'remaining': "{:.2f}".format(sum(m['payment_amount'] for m in match_history if not m['has_paid']))
-        }
-        
-        return {
-            'total_matches': total_matches,
-            'wins': wins,
-            'draws': draws,
-            'losses': total_matches - wins - draws,
-            'win_rate': (wins / total_matches * 100) if total_matches > 0 else 0,
-            'match_history': match_history,
-            'payment_stats': payment_stats
-        } 
+            return {
+                'total_matches': total_matches,
+                'wins': wins,
+                'draws': draws,
+                'losses': total_matches - wins - draws,
+                'win_rate': (wins / total_matches * 100) if total_matches > 0 else 0,
+                'match_history': match_history,
+                'payment_stats': payment_stats
+            }
+        except Exception as e:
+            print(f"Maç getirme hatası: {str(e)}")
+            return None 

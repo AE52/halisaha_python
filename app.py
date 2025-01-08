@@ -5,9 +5,36 @@ from config import Config
 from functools import wraps
 from translations import translations
 import jwt
+from pymongo import MongoClient
+import os
+from bson import ObjectId
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# MongoDB bağlantısı
+client = MongoClient(
+    Config.MONGO_URI,
+    serverSelectionTimeoutMS=5000,
+    retryWrites=True,
+    retryReads=True,
+    connectTimeoutMS=30000,
+    socketTimeoutMS=None,
+    connect=False
+)
+
+# Veritabanı ve koleksiyonları tanımla
+db = client[Config.MONGO_DB]
+matches = db.matches
+players = db.players
+reactions = db.reactions  # Reaksiyonlar için koleksiyon
+
+# Bağlantıyı test et
+try:
+    client.admin.command('ping')
+    print("MongoDB bağlantısı başarılı!")
+except Exception as e:
+    print(f"MongoDB bağlantı hatası: {str(e)}")
 
 # Decorator'ları en başa alalım
 def admin_required(f):
@@ -522,41 +549,33 @@ def toggle_payment_status(match_id, player_id):
 
 @app.route('/players/<id>')
 def player_profile(id):
-    player = Player.get_by_id(id)
-    if not player:
-        flash('Oyuncu bulunamadı', 'error')
+    try:
+        player = Player.get_by_id(id)
+        if not player:
+            flash('Oyuncu bulunamadı', 'error')
+            return redirect(url_for('players'))
+        
+        # Oyuncunun istatistiklerini al
+        stats = Player.get_stats(id)
+        
+        # Beğeni istatistiklerini al
+        reactions = Player.get_reactions(id)
+        total_reactions = reactions['likes'] + reactions['dislikes']
+        like_percent = (reactions['likes'] / total_reactions * 100) if total_reactions > 0 else 0
+        dislike_percent = (reactions['dislikes'] / total_reactions * 100) if total_reactions > 0 else 0
+        
+        return render_template('player_profile.html',
+                             player=player,
+                             stats=stats,
+                             like_count=reactions['likes'],
+                             dislike_count=reactions['dislikes'],
+                             like_percent=like_percent,
+                             dislike_percent=dislike_percent,
+                             is_logged_in=bool(request.cookies.get('player_token')))
+    except Exception as e:
+        print(f"Oyuncu profili hatası: {str(e)}")
+        flash('Oyuncu profili görüntülenirken bir hata oluştu', 'error')
         return redirect(url_for('players'))
-    
-    # İstatistikleri hesapla
-    stats = Player.get_stats(id)
-    
-    # Beğeni ve yorum istatistiklerini hesapla
-    reactions = Player.get_reactions(id)
-    total_reactions = reactions['likes'] + reactions['dislikes']
-    
-    like_percent = (reactions['likes'] / total_reactions * 100) if total_reactions > 0 else 0
-    dislike_percent = (reactions['dislikes'] / total_reactions * 100) if total_reactions > 0 else 0
-    
-    # Admin kontrolü
-    is_admin = False
-    token = request.cookies.get('jwt_token')
-    if token:
-        try:
-            jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            is_admin = True
-        except:
-            pass
-
-    return render_template('player_profile.html',
-                         player=player,
-                         stats=stats,
-                         like_count=reactions['likes'],
-                         dislike_count=reactions['dislikes'],
-                         like_percent=like_percent,
-                         dislike_percent=dislike_percent,
-                         current_user_reaction=reactions.get('current_user_reaction'),
-                         comments=Player.get_comments(id),
-                         is_admin=is_admin)
 
 @app.route('/new-match', methods=['GET'])
 @admin_required
@@ -924,12 +943,41 @@ def update_team_payments(id):
 
 @app.route('/matches/<id>')
 def match_detail(id):
-    match = Match.get_by_id(id)
-    if not match:
-        flash('Maç bulunamadı', 'error')
-        return redirect(url_for('matches'))
+    try:
+        print(f"Maç detayı istendi. ID: {id}")  # Debug log
+        match = Match.get_by_id(id)
         
-    return render_template('match_detail.html', match=match)
+        if not match:
+            print(f"Maç bulunamadı. ID: {id}")  # Debug log
+            flash('Maç bulunamadı', 'error')
+            return redirect(url_for('matches'))
+            
+        print(f"Maç bulundu: {match}")  # Debug log - maç verisini kontrol et
+        
+        # Her oyuncu için bilgileri al
+        for team in ['a', 'b']:
+            for player in match['teams'][team]:
+                player_info = Player.get_by_id(player['player_id'])
+                if player_info:
+                    player.update(player_info)
+                else:
+                    print(f"Oyuncu bulunamadı: {player['player_id']}")  # Debug log
+        
+        return render_template('match_detail.html', 
+                             match=match,
+                             is_admin=bool(request.cookies.get('jwt_token')))
+    except Exception as e:
+        print(f"Maç detay hatası: {str(e)}")  # Debug log
+        flash('Maç detayı görüntülenirken bir hata oluştu', 'error')
+        return redirect(url_for('matches'))
+
+@app.template_filter('get_stat_class')
+def get_stat_class(value):
+    if value >= 80:
+        return 'high'
+    elif value >= 60:
+        return 'medium'
+    return 'low'
 
 if __name__ == '__main__':
     app.run(debug=True) 

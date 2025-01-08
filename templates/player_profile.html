@@ -169,37 +169,20 @@
 
         <!-- Orta Kolon: Maç Geçmişi -->
         <div class="col-lg-4">
-            <div class="match-history-card">
-                <h4><i class="fas fa-history"></i> Maç Geçmişi</h4>
-                <div class="match-list">
-                    {% for match in stats.match_history %}
-                    <a href="/matches/{{ match.id }}" class="match-item {{ 'win' if match.is_winner else 'loss' if not match.is_draw else 'draw' }}">
-                        <div class="match-header">
-                            <div class="match-date">
-                                <i class="far fa-calendar"></i>
-                                {{ match.date.strftime('%d/%m/%Y') }}
-                            </div>
-                            <div class="match-location">
-                                <i class="fas fa-map-marker-alt"></i>
-                                {{ match.location }}
-                            </div>
+            <div class="match-history">
+                {% for match in stats.match_history %}
+                <a href="{{ url_for('match_detail', id=match.match_id) }}" class="match-card {{ 'win' if match.is_winner else 'loss' if not match.is_draw else 'draw' }}">
+                    <div class="match-info">
+                        <div class="match-date">{{ match.date.strftime('%d/%m/%Y') }}</div>
+                        <div class="match-score">{{ match.score_team_a|default('-') }} - {{ match.score_team_b|default('-') }}</div>
+                        <div class="match-location">{{ match.location }}</div>
+                        <div class="match-payment">
+                            <span class="amount">{{ "%.2f"|format(match.payment_amount) }} TL</span>
+                            <i class="fas fa-{{ 'check-circle' if match.has_paid else 'times-circle' }}"></i>
                         </div>
-                        <div class="match-score-container">
-                            <div class="team team-a">Takım A</div>
-                            <div class="score">
-                                <span>{{ match.score_team_a|default('-') }}</span>
-                                <span class="score-divider">-</span>
-                                <span>{{ match.score_team_b|default('-') }}</span>
-                            </div>
-                            <div class="team team-b">Takım B</div>
-                        </div>
-                        <div class="match-payment {{ 'paid' if match.has_paid else 'unpaid' }}">
-                            <span class="amount">{{ match.payment_amount }} TL</span>
-                            <i class="fas fa-{{ 'check-circle' if match.has_paid else 'exclamation-circle' }}"></i>
-                        </div>
-                    </a>
-                    {% endfor %}
-                </div>
+                    </div>
+                </a>
+                {% endfor %}
             </div>
         </div>
 

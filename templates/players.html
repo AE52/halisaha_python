@@ -75,56 +75,43 @@
         <h3 class="mb-4"><i class="fas fa-users"></i> Oyuncular</h3>
         <div class="players-grid">
             {% for player in players %}
-            <div class="player-card {{ get_player_card_class(player.overall) }}"
-                 onclick="window.location.href='{{ url_for('player_profile', id=player._id) }}'">
-                <div class="card-background"></div>
+            <div class="player-card {{ get_player_card_class(player.overall) }}" 
+                 onclick="window.location.href='/players/{{ player._id }}'"
+                 data-id="{{ player._id }}">
                 <div class="card-content">
+                    <!-- Üst Kısım: Overall ve Pozisyon -->
                     <div class="card-header">
-                        <div class="overall-rating">{{ player.overall }}</div>
-                        <div class="position-badge {{ player.position }}">{{ player.position }}</div>
-                        <div class="player-name">{{ player.name }}</div>
+                        <div class="overall">{{ player.overall }}</div>
+                        <div class="position-badge">{{ player.position }}</div>
                     </div>
+
+                    <!-- Oyuncu Adı -->
+                    <div class="player-name">{{ player.name }}</div>
+
+                    <!-- Statlar -->
                     <div class="stats-grid">
                         <div class="stat-item">
                             <span class="stat-label">PAC</span>
-                            <div class="stat-bar">
-                                <div class="stat-fill" style="width: {{ player.stats.pace }}%"></div>
-                            </div>
                             <span class="stat-value {{ get_stat_class(player.stats.pace) }}">{{ player.stats.pace }}</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">ŞUT</span>
-                            <div class="stat-bar">
-                                <div class="stat-fill" style="width: {{ player.stats.shooting }}%"></div>
-                            </div>
+                            <span class="stat-label">SHO</span>
                             <span class="stat-value {{ get_stat_class(player.stats.shooting) }}">{{ player.stats.shooting }}</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">PAS</span>
-                            <div class="stat-bar">
-                                <div class="stat-fill" style="width: {{ player.stats.passing }}%"></div>
-                            </div>
                             <span class="stat-value {{ get_stat_class(player.stats.passing) }}">{{ player.stats.passing }}</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">DRB</span>
-                            <div class="stat-bar">
-                                <div class="stat-fill" style="width: {{ player.stats.dribbling }}%"></div>
-                            </div>
+                            <span class="stat-label">DRI</span>
                             <span class="stat-value {{ get_stat_class(player.stats.dribbling) }}">{{ player.stats.dribbling }}</span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">DEF</span>
-                            <div class="stat-bar">
-                                <div class="stat-fill" style="width: {{ player.stats.defending }}%"></div>
-                            </div>
                             <span class="stat-value {{ get_stat_class(player.stats.defending) }}">{{ player.stats.defending }}</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">FZK</span>
-                            <div class="stat-bar">
-                                <div class="stat-fill" style="width: {{ player.stats.physical }}%"></div>
-                            </div>
+                            <span class="stat-label">PHY</span>
                             <span class="stat-value {{ get_stat_class(player.stats.physical) }}">{{ player.stats.physical }}</span>
                         </div>
                     </div>
@@ -136,183 +123,190 @@
 </div>
 
 <style>
-.player-card {
-    width: 280px;
-    height: 400px;
-    position: relative;
-    border-radius: 15px;
-    overflow: hidden;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    margin: 15px;
-}
-
-/* Kart Renkleri ve Efektleri */
-.player-card.elite {
-    background: linear-gradient(45deg, #1a237e, #311b92);
-    box-shadow: 0 0 30px rgba(26, 35, 126, 0.6);
-    border: 2px solid #7c4dff;
-}
-
-.player-card.gold {
-    background: linear-gradient(45deg, #ffd700, #ffa000);
-    box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
-    border: 2px solid #ffeb3b;
-}
-
-.player-card.silver {
-    background: linear-gradient(45deg, #9e9e9e, #757575);
-    box-shadow: 0 0 30px rgba(158, 158, 158, 0.6);
-    border: 2px solid #bdbdbd;
-}
-
-.player-card.bronze {
-    background: linear-gradient(45deg, #8d6e63, #795548);
-    box-shadow: 0 0 30px rgba(141, 110, 99, 0.6);
-    border: 2px solid #a1887f;
-}
-
-/* Kart İçeriği */
-.card-header {
-    padding: 20px;
-    text-align: center;
-    position: relative;
-}
-
-.overall-rating {
-    font-size: 60px;
-    font-weight: bold;
-    color: white;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-    margin-bottom: 10px;
-}
-
-.position-badge {
-    background: rgba(255,255,255,0.2);
-    padding: 5px 15px;
-    border-radius: 20px;
-    color: white;
-    font-weight: bold;
-    margin: 10px 0;
-}
-
-.player-name {
-    font-size: 24px;
-    color: white;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-    margin: 15px 0;
-}
-
-/* Stat Çubukları */
-.stats-grid {
-    padding: 20px;
-}
-
-.stat-item {
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
-    color: white;
-}
-
-.stat-label {
-    width: 40px;
-    font-weight: bold;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-}
-
-.stat-bar {
-    flex: 1;
-    height: 8px;
-    background: rgba(255,255,255,0.2);
-    border-radius: 4px;
-    margin: 0 10px;
-    overflow: hidden;
-}
-
-.stat-fill {
-    height: 100%;
-    border-radius: 4px;
-    background: linear-gradient(90deg, rgba(255,255,255,0.5), rgba(255,255,255,0.8));
-    transition: width 0.3s ease;
-}
-
-.stat-value {
-    width: 30px;
-    text-align: right;
-    font-weight: bold;
-}
-
-/* Hover Efektleri */
-.player-card:hover {
-    transform: translateY(-10px) scale(1.02);
-    box-shadow: 0 15px 30px rgba(0,0,0,0.4);
-}
-
-.player-card.elite:hover {
-    animation: eliteGlow 2s infinite alternate;
-}
-
-.player-card.gold:hover {
-    animation: goldGlow 2s infinite alternate;
-}
-
-@keyframes eliteGlow {
-    from {
-        box-shadow: 0 0 20px rgba(124, 77, 255, 0.5),
-                    0 0 40px rgba(124, 77, 255, 0.3);
-    }
-    to {
-        box-shadow: 0 0 30px rgba(124, 77, 255, 0.8),
-                    0 0 60px rgba(124, 77, 255, 0.5);
-    }
-}
-
-@keyframes goldGlow {
-    from {
-        box-shadow: 0 0 20px rgba(255, 215, 0, 0.5),
-                    0 0 40px rgba(255, 215, 0, 0.3);
-    }
-    to {
-        box-shadow: 0 0 30px rgba(255, 215, 0, 0.8),
-                    0 0 60px rgba(255, 215, 0, 0.5);
-    }
-}
-
-/* Stat renkleri */
-.stat-high { color: #4caf50; }
-.stat-medium { color: #ffc107; }
-.stat-low { color: #f44336; }
-
-/* Pozisyon rozetleri */
-.position-badge.Kaleci { background: #f44336; }
-.position-badge.Defans { background: #2196f3; }
-.position-badge.OrtaSaha { background: #4caf50; }
-.position-badge.Forvet { background: #ff9800; }
-
-/* Kart Arkaplanı */
-.card-background {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0.1;
-    background-size: cover;
-    background-position: center;
-    z-index: 0;
-}
-
-.card-content {
-    position: relative;
-    z-index: 1;
-}
-
 .players-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 20px;
     padding: 20px;
 }
+
+.player-card {
+    width: 100%;
+    background: linear-gradient(135deg, #2c3e50, #3498db);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 15px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.player-card:hover {
+    transform: translateY(-10px) scale(1.02);
+    transition: all 0.3s ease;
+}
+
+.player-card.elite {
+    background: linear-gradient(135deg, #8e44ad, #2980b9);
+    border: 2px solid #9b59b6;
+    animation: glowElite 2s infinite;
+}
+
+.player-card.gold {
+    background: linear-gradient(135deg, #f1c40f, #e67e22);
+    border: 2px solid #f39c12;
+    animation: glowGold 2s infinite;
+}
+
+.player-card.silver {
+    background: linear-gradient(135deg, #bdc3c7, #95a5a6);
+    border: 2px solid #7f8c8d;
+    animation: glowSilver 2s infinite;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.overall {
+    font-size: 32px;
+    font-weight: bold;
+    background: linear-gradient(45deg, #f1c40f, #f39c12);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.position-badge {
+    background: linear-gradient(45deg, #3498db, #2980b9);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 15px;
+    font-weight: bold;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.player-name {
+    font-size: 1.1em;
+    font-weight: bold;
+    margin-bottom: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.stat-item {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.1);
+    backdrop-filter: blur(5px);
+    padding: 4px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.7em;
+    color: rgba(255,255,255,0.7);
+}
+
+.stat-value {
+    display: block;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+.stat-value.high { 
+    color: #2ecc71;
+    text-shadow: 0 0 10px rgba(46,204,113,0.5);
+}
+
+.stat-value.medium { 
+    color: #f1c40f;
+    text-shadow: 0 0 10px rgba(241,196,15,0.5);
+}
+
+.stat-value.low { 
+    color: #e74c3c;
+    text-shadow: 0 0 10px rgba(231,76,60,0.5);
+}
+
+@keyframes glowElite {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(142,68,173,0.6);
+        transform: translateY(-5px);
+    }
+    50% { 
+        box-shadow: 0 0 30px rgba(142,68,173,0.8);
+        transform: translateY(-8px);
+    }
+}
+
+@keyframes glowGold {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(241,196,15,0.6);
+        transform: translateY(-5px);
+    }
+    50% { 
+        box-shadow: 0 0 30px rgba(241,196,15,0.8);
+        transform: translateY(-8px);
+    }
+}
+
+@keyframes glowSilver {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(189,195,199,0.6);
+        transform: translateY(-5px);
+    }
+    50% { 
+        box-shadow: 0 0 30px rgba(189,195,199,0.8);
+        transform: translateY(-8px);
+    }
+}
+
+/* Responsive tasarım */
+@media (max-width: 768px) {
+    .players-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
+        padding: 15px;
+    }
+
+    .player-card {
+        padding: 12px;
+    }
+
+    .stats-grid {
+        gap: 4px;
+    }
+
+    .stat-item {
+        padding: 3px;
+    }
+
+    .stat-label {
+        font-size: 0.65em;
+    }
+
+    .stat-value {
+        font-size: 0.85em;
+    }
+}
+
+/* Pozisyona göre renkler */
+.position-badge:contains('Kaleci') { background: linear-gradient(45deg, #e74c3c, #c0392b); }
+.position-badge:contains('Defans') { background: linear-gradient(45deg, #3498db, #2980b9); }
+.position-badge:contains('Orta Saha') { background: linear-gradient(45deg, #2ecc71, #27ae60); }
+.position-badge:contains('Forvet') { background: linear-gradient(45deg, #f1c40f, #f39c12); }
 </style>
 {% endblock %} 
