@@ -1,6 +1,23 @@
 runtime: python39
+instance_class: F1
+
 env_variables:
-  MONGO_URI: "mongodb+srv://ae52:Erenemir1comehacker@cluster0.y5nv8.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-  DB_NAME: "halisaha_db"
-  SECRET_KEY: "your-secret-key-here"
-  ADMIN_API_KEY: "AE52YAPAR" 
+  MONGO_URI: "your_mongodb_uri"
+  MONGO_DB: "your_db_name"
+  SECRET_KEY: "your_secret_key"
+
+handlers:
+- url: /.*
+  script: auto
+
+health_check:
+  enable_health_check: True
+  check_interval_sec: 30
+  timeout_sec: 4
+  unhealthy_threshold: 2
+  healthy_threshold: 2
+
+automatic_scaling:
+  target_cpu_utilization: 0.65
+  min_instances: 1
+  max_instances: 10 

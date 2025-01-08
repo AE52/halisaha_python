@@ -40,39 +40,21 @@ except Exception as e:
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        token = None
-        
-        # Token'ı header'dan al
-        if 'Authorization' in request.headers:
-            auth_header = request.headers['Authorization']
-            try:
-                token = auth_header.split(" ")[1]
-            except IndexError:
-                pass
-        
-        # Cookie'den token kontrolü
-        if not token:
-            token = request.cookies.get('jwt_token')
+        token = request.cookies.get('jwt_token')
         
         if not token:
-            # API isteği ise JSON yanıt döndür
-            if request.path.startswith('/api/'):
-                return jsonify({'message': 'Token bulunamadı!'}), 401
-            # Normal sayfa isteği ise login'e yönlendir
-            return redirect(url_for('login'))
+            flash('Yönetici girişi gerekli', 'error')
+            return redirect(url_for('admin_login'))
 
         try:
             # Token'ı doğrula
             jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
             return f(*args, **kwargs)
-        except jwt.ExpiredSignatureError:
-            if request.path.startswith('/api/'):
-                return jsonify({'message': 'Token süresi doldu!'}), 401
-            return redirect(url_for('login'))
-        except jwt.InvalidTokenError:
-            if request.path.startswith('/api/'):
-                return jsonify({'message': 'Geçersiz token!'}), 401
-            return redirect(url_for('login'))
+        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+            flash('Oturum süresi doldu veya geçersiz', 'error')
+            response = make_response(redirect(url_for('admin_login')))
+            response.delete_cookie('jwt_token')  # Token'ı sil
+            return response
             
     return decorated_function
 
@@ -183,7 +165,11 @@ def get_player_card_class(overall):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    is_admin = bool(request.cookies.get('jwt_token'))
+    is_logged_in = bool(request.cookies.get('player_token'))
+    return render_template('index.html', 
+                         is_admin=is_admin,
+                         is_logged_in=is_logged_in)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -290,7 +276,7 @@ def delete_player_api(id):
 @app.route('/players')
 def players():
     try:
-        # MongoDB'den aktif oyuncuları al
+        is_admin = bool(request.cookies.get('jwt_token'))
         players_list = Player.get_all_active()
         
         # Her oyuncu için overall değerini hesapla
@@ -323,19 +309,31 @@ def players():
                 'physical': stats.get('physical', 70)
             }
             
-        return render_template('players.html', players=players_list)
+        return render_template('players.html', 
+                             players=players_list,
+                             is_admin=is_admin)
     except Exception as e:
         flash(str(e), 'error')
         return redirect(url_for('index'))
 
 @app.route('/matches')
 def matches():
-    matches = Match.get_all()
-    all_players = Player.get_all_active()
-    return render_template('matches.html', 
-                         matches=matches, 
-                         all_players=all_players,
-                         now=datetime.now())
+    try:
+        is_admin = bool(request.cookies.get('jwt_token'))
+        is_logged_in = bool(request.cookies.get('player_token'))
+        matches_list = Match.get_all()
+        
+        # Şu anki zamanı ekle
+        now = datetime.now()
+        
+        return render_template('matches.html', 
+                             matches=matches_list,
+                             is_admin=is_admin,
+                             is_logged_in=is_logged_in,
+                             now=now)
+    except Exception as e:
+        flash(str(e), 'error')
+        return redirect(url_for('index'))
 
 # Maç API endpoint'leri
 @app.route('/api/matches', methods=['POST'])
@@ -944,30 +942,31 @@ def update_team_payments(id):
 @app.route('/matches/<id>')
 def match_detail(id):
     try:
-        print(f"Maç detayı istendi. ID: {id}")  # Debug log
+        is_admin = bool(request.cookies.get('jwt_token'))
         match = Match.get_by_id(id)
         
         if not match:
-            print(f"Maç bulunamadı. ID: {id}")  # Debug log
             flash('Maç bulunamadı', 'error')
             return redirect(url_for('matches'))
-            
-        print(f"Maç bulundu: {match}")  # Debug log - maç verisini kontrol et
         
-        # Her oyuncu için bilgileri al
-        for team in ['a', 'b']:
-            for player in match['teams'][team]:
-                player_info = Player.get_by_id(player['player_id'])
-                if player_info:
-                    player.update(player_info)
-                else:
-                    print(f"Oyuncu bulunamadı: {player['player_id']}")  # Debug log
+        # Token varsa doğrula
+        if is_admin:
+            try:
+                jwt.decode(request.cookies.get('jwt_token'), 
+                         app.config['SECRET_KEY'], 
+                         algorithms=["HS256"])
+            except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+                is_admin = False
+                response = make_response(render_template('match_detail.html', 
+                                                      match=match,
+                                                      is_admin=False))
+                response.delete_cookie('jwt_token')
+                return response
         
         return render_template('match_detail.html', 
                              match=match,
-                             is_admin=bool(request.cookies.get('jwt_token')))
+                             is_admin=is_admin)
     except Exception as e:
-        print(f"Maç detay hatası: {str(e)}")  # Debug log
         flash('Maç detayı görüntülenirken bir hata oluştu', 'error')
         return redirect(url_for('matches'))
 
@@ -978,6 +977,37 @@ def get_stat_class(value):
     elif value >= 60:
         return 'medium'
     return 'low'
+
+@app.route('/admin-login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        api_key = request.form.get('api_key')
+        if api_key == API_KEY:
+            # JWT token oluştur
+            token = jwt.encode({
+                'admin': True,
+                'exp': datetime.utcnow() + timedelta(days=7)
+            }, app.config['SECRET_KEY'])
+            
+            # Token'ı cookie'ye kaydet ve yönlendir
+            response = make_response(redirect(url_for('index')))
+            response.set_cookie('jwt_token', token, httponly=True)
+            return response
+        else:
+            flash('Geçersiz API key!', 'error')
+            return redirect(url_for('admin_login'))
+    
+    return render_template('admin_login.html')
+
+# Health check endpoint'i ekle
+@app.route('/health')
+def health_check():
+    try:
+        # MongoDB bağlantısını kontrol et
+        client.admin.command('ping')
+        return jsonify({"status": "healthy"}), 200
+    except Exception as e:
+        return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True) 

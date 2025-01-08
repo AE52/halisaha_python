@@ -1,55 +1,35 @@
-# Python resmi imajını kullan - slim versiyonu daha küçük
-FROM python:3.11-slim
+# Base image olarak Python 3.9 kullan
+FROM python:3.9-slim
 
-# Çalışma dizinini belirle
+# Çalışma dizinini ayarla
 WORKDIR /app
 
-# Ortam değişkenlerini ayarla
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PORT=8080
+# Sistem bağımlılıklarını yükle
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Sistem bağımlılıklarını yükle ve önbelleği temizle
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        build-essential \
-        python3-dev \
-        libpq-dev \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
-
-# requirements.txt dosyasını kopyala
+# Python bağımlılıklarını kopyala ve yükle
 COPY requirements.txt .
-
-# Python paketlerini yükle
 RUN pip install --no-cache-dir -r requirements.txt
 
-# SQLite veritabanı için dizin oluştur
-RUN mkdir -p /app/instance
-
-# Önce veritabanı dosyasını kopyala
-COPY instance/halisaha.db /app/instance/
-
-# Sonra uygulama kodlarını kopyala
+# Uygulama kodlarını kopyala
 COPY . .
 
-# Güvenlik için root olmayan kullanıcıya geç
-RUN useradd -m appuser && chown -R appuser:appuser /app
+# Non-root kullanıcı oluştur
+RUN useradd -m appuser
+RUN chown -R appuser:appuser /app
 USER appuser
 
-# Sağlık kontrolü
+# Port'u ortam değişkeninden al
+ENV PORT=8080
+
+# Health check tanımla
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Uygulamayı çalıştır
-CMD exec gunicorn --bind :$PORT \
-    --workers 2 \
-    --threads 8 \
-    --timeout 0 \
-    --access-logfile - \
-    --error-logfile - \
-    --log-level info \
-    app:app 
+# Uygulamayı başlat
+CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 app:app 
 
 # MongoDB bağlantısı için gerekli paketleri ekleyelim
 RUN apt-get update && apt-get install -y \

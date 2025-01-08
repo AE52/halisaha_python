@@ -5,64 +5,74 @@
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h3><i class="fas fa-trophy"></i> {{ translate('matchlist') }}</h3>
-            <a href="/new-match" class="btn btn-primary admin-only">
-                <i class="fas fa-plus"></i> {{ translate('new_match') }}
-            </a>
+            {% if is_admin %}
+                <a href="{{ url_for('new_match') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> {{ translate('new_match') }}
+                </a>
+            {% endif %}
         </div>
 
         <!-- Gelecek Maçlar -->
         <h4 class="mb-3">{{ translate('upcomingmatches') }}</h4>
-        {% for match in matches if match.date >= now %}
-        <div class="card match-card mb-3">
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-12 col-md-4">
-                        <h5 class="mb-2"><i class="fas fa-calendar"></i> {{ match.date.strftime('%d/%m/%Y %H:%M') }}</h5>
-                        <p class="mb-2"><i class="fas fa-map-marker-alt"></i> {{ match.location }}</p>
-                    </div>
-                    <div class="col-12 col-md-4 text-center">
-                        {% if match.score.team_a is not none and match.score.team_b is not none %}
-                            <h4 class="mb-2">{{ match.score.team_a }} - {{ match.score.team_b }}</h4>
-                        {% else %}
-                            <h4 class="mb-2">VS</h4>
-                        {% endif %}
-                    </div>
-                    <div class="col-12 col-md-4 text-md-right text-center">
-                        <h5 class="mb-2">{{ match.total_cost }} TL</h5>
-                        <p>Kişi Başı: {{ "%.2f"|format(match.total_cost / (match.teams.a|length + match.teams.b|length)) }} TL</p>
+        <div class="matches-grid">
+            {% for match in matches if match.date and match.date >= now %}
+                <div class="card match-card mb-3">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-4">
+                                <h5 class="mb-2"><i class="fas fa-calendar"></i> {{ match.date.strftime('%d/%m/%Y %H:%M') }}</h5>
+                                <p class="mb-2"><i class="fas fa-map-marker-alt"></i> {{ match.location }}</p>
+                            </div>
+                            <div class="col-12 col-md-4 text-center">
+                                {% if match.score.team_a is not none and match.score.team_b is not none %}
+                                    <h4 class="mb-2">{{ match.score.team_a }} - {{ match.score.team_b }}</h4>
+                                {% else %}
+                                    <h4 class="mb-2">VS</h4>
+                                {% endif %}
+                            </div>
+                            <div class="col-12 col-md-4 text-md-right text-center">
+                                <h5 class="mb-2">{{ match.total_cost }} TL</h5>
+                                <p>Kişi Başı: {{ "%.2f"|format(match.total_cost / (match.teams.a|length + match.teams.b|length)) }} TL</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            {% else %}
+                <p>Planlanmış maç bulunmuyor.</p>
+            {% endfor %}
         </div>
-        {% endfor %}
 
         <!-- Geçmiş Maçlar -->
         <h4 class="mb-3 mt-5">{{ translate('pastmatches') }}</h4>
-        {% for match in matches if match.date < now %}
-        <div class="card match-card mb-3" onclick="window.location.href='/matches/{{ match._id }}'">
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-12 col-md-4">
-                        <h5 class="mb-2"><i class="fas fa-calendar"></i> {{ match.date.strftime('%d/%m/%Y %H:%M') }}</h5>
-                        <p class="mb-2"><i class="fas fa-map-marker-alt"></i> {{ match.location }}</p>
-                    </div>
-                    <div class="col-12 col-md-4 text-center">
-                        {% if match.score.team_a is not none and match.score.team_b is not none %}
-                            <h4 class="mb-2">{{ match.score.team_a }} - {{ match.score.team_b }}</h4>
-                            <div class="badge badge-info">Maç Tamamlandı</div>
-                        {% else %}
-                            <h4 class="mb-2">VS</h4>
-                            <div class="badge badge-warning">Sonuç Girilmedi</div>
-                        {% endif %}
-                    </div>
-                    <div class="col-12 col-md-4 text-md-right text-center">
-                        <h5 class="mb-2">{{ match.total_cost }} TL</h5>
-                        <p>Kişi Başı: {{ "%.2f"|format(match.total_cost / (match.teams.a|length + match.teams.b|length)) }} TL</p>
+        <div class="matches-grid">
+            {% for match in matches if match.date and match.date < now %}
+                <div class="card match-card mb-3" onclick="window.location.href='/matches/{{ match._id }}'">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-4">
+                                <h5 class="mb-2"><i class="fas fa-calendar"></i> {{ match.date.strftime('%d/%m/%Y %H:%M') }}</h5>
+                                <p class="mb-2"><i class="fas fa-map-marker-alt"></i> {{ match.location }}</p>
+                            </div>
+                            <div class="col-12 col-md-4 text-center">
+                                {% if match.score.team_a is not none and match.score.team_b is not none %}
+                                    <h4 class="mb-2">{{ match.score.team_a }} - {{ match.score.team_b }}</h4>
+                                    <div class="badge badge-info">Maç Tamamlandı</div>
+                                {% else %}
+                                    <h4 class="mb-2">VS</h4>
+                                    <div class="badge badge-warning">Sonuç Girilmedi</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-12 col-md-4 text-md-right text-center">
+                                <h5 class="mb-2">{{ match.total_cost }} TL</h5>
+                                <p>Kişi Başı: {{ "%.2f"|format(match.total_cost / (match.teams.a|length + match.teams.b|length)) }} TL</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            {% else %}
+                <p>Geçmiş maç bulunmuyor.</p>
+            {% endfor %}
         </div>
-        {% endfor %}
 
         {% if not matches %}
         <div class="alert alert-info">

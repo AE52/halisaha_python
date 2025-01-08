@@ -233,11 +233,11 @@ body {
 
 /* Admin elementleri */
 .admin-only {
-    display: none;
+    display: none !important;
 }
 
-.admin-only.show {
-    display: block;
+body[data-admin="true"] .admin-only {
+    display: block !important;
 }
 
 /* Ödeme durumu ikonları */

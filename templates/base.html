@@ -14,70 +14,54 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
 </head>
-<body>
+<body data-admin="{{ 'true' if is_admin else 'false' }}">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('index') }}">
-                <i class="fas fa-futbol"></i> Halısaha
-            </a>
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
+            <a class="navbar-brand" href="{{ url_for('index') }}">Halı Saha</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav mr-auto">
+                <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('players') }}">
-                            <i class="fas fa-users"></i> {{ translate('players') }}
-                        </a>
+                        <a class="nav-link" href="{{ url_for('matches') }}">Maçlar</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('matches') }}">
-                            <i class="fas fa-trophy"></i> {{ translate('matches') }}
-                        </a>
+                        <a class="nav-link" href="{{ url_for('players') }}">Oyuncular</a>
                     </li>
                 </ul>
-                
-                <ul class="navbar-nav ml-auto">
-                    {% if request.cookies.get('jwt_token') %}
-                        <!-- Admin girişi yapılmışsa -->
+                <ul class="navbar-nav">
+                    {% if is_admin %}
                         <li class="nav-item">
-                            <span class="nav-link">
-                                <i class="fas fa-user-shield"></i> Admin
+                            <span class="nav-link text-warning">
+                                <i class="fas fa-crown"></i> Admin
                             </span>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('admin_logout') }}">
-                                <i class="fas fa-sign-out-alt"></i> {{ translate('admin_logout') }}
+                                <i class="fas fa-sign-out-alt"></i> Çıkış Yap
                             </a>
                         </li>
-                    {% elif session.get('player_id') %}
-                        <!-- Oyuncu girişi yapılmışsa -->
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="playerDropdown" role="button" 
-                               data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                <i class="fas fa-user"></i> {{ translate('my_profile') }}
+                    {% elif is_logged_in %}
+                        <li class="nav-item">
+                            <span class="nav-link text-info">
+                                <i class="fas fa-user"></i> {{ current_user.name }}
+                            </span>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt"></i> Çıkış Yap
                             </a>
-                            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="playerDropdown">
-                                <a class="dropdown-item" href="{{ url_for('player_profile', id=session.get('player_id')) }}">
-                                    <i class="fas fa-id-card"></i> {{ translate('profile') }}
-                                </a>
-                                <div class="dropdown-divider"></div>
-                                <a class="dropdown-item" href="{{ url_for('player_logout') }}">
-                                    <i class="fas fa-sign-out-alt"></i> {{ translate('logout') }}
-                                </a>
-                            </div>
                         </li>
                     {% else %}
-                        <!-- Hiç giriş yapılmamışsa -->
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('player_login') }}">
-                                <i class="fas fa-sign-in-alt"></i> {{ translate('player_login') }}
+                                <i class="fas fa-user"></i> Oyuncu Girişi
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link admin-login-btn" href="#" onclick="showLoginModal()">
-                                <i class="fas fa-lock"></i> {{ translate('admin_login') }}
+                            <a class="nav-link" href="{{ url_for('admin_login') }}">
+                                <i class="fas fa-user-shield"></i> Yönetici Girişi
                             </a>
                         </li>
                     {% endif %}
