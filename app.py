@@ -96,13 +96,17 @@ def get_translation(key, **kwargs):
     return text
 
 def get_player_card_class(overall):
-    if overall >= 85:
-        return 'elite'
-    elif overall >= 75:
-        return 'gold'
-    elif overall >= 65:
-        return 'silver'
-    else:
+    try:
+        overall = int(overall)
+        if overall >= 88:
+            return 'elite'      # Mor (En üst seviye)
+        elif overall >= 82:
+            return 'gold'       # Altın (Yüksek seviye)
+        elif overall >= 75:
+            return 'silver'     # Gümüş (Orta seviye)
+        else:
+            return 'bronze'     # Bronz (Başlangıç seviye)
+    except (TypeError, ValueError):
         return 'bronze'
 
 @app.context_processor
@@ -141,27 +145,13 @@ def get_stat_class(value):
     try:
         value = int(value)
         if value >= 85:
-            return 'stat-high'
-        elif value >= 70:
-            return 'stat-medium'
+            return 'high'       # Yeşil (Çok iyi)
+        elif value >= 75:
+            return 'medium'     # Sarı (İyi)
         else:
-            return 'stat-low'
+            return 'low'        # Kırmızı (Geliştirilmeli)
     except (TypeError, ValueError):
-        return 'stat-low'  # Varsayılan değer
-
-def get_player_card_class(overall):
-    try:
-        overall = int(overall)
-        if overall >= 85:
-            return 'elite'
-        elif overall >= 75:
-            return 'gold'
-        elif overall >= 65:
-            return 'silver'
-        else:
-            return 'bronze'
-    except (TypeError, ValueError):
-        return 'bronze'  # Varsayılan değer
+        return 'low'
 
 @app.route('/')
 def index():
@@ -975,13 +965,33 @@ def match_detail(id):
                              error_message="Maç detayı görüntülenirken bir hata oluştu",
                              error_details=str(e)), 404
 
+@app.template_filter('get_player_card_class')
+def get_player_card_class(overall):
+    try:
+        overall = int(overall)
+        if overall >= 88:
+            return 'elite'      # Mor (En üst seviye)
+        elif overall >= 82:
+            return 'gold'       # Altın (Yüksek seviye)
+        elif overall >= 75:
+            return 'silver'     # Gümüş (Orta seviye)
+        else:
+            return 'bronze'     # Bronz (Başlangıç seviye)
+    except (TypeError, ValueError):
+        return 'bronze'
+
 @app.template_filter('get_stat_class')
 def get_stat_class(value):
-    if value >= 80:
-        return 'high'
-    elif value >= 60:
-        return 'medium'
-    return 'low'
+    try:
+        value = int(value)
+        if value >= 85:
+            return 'high'       # Yeşil (Çok iyi)
+        elif value >= 75:
+            return 'medium'     # Sarı (İyi)
+        else:
+            return 'low'        # Kırmızı (Geliştirilmeli)
+    except (TypeError, ValueError):
+        return 'low'
 
 @app.route('/admin-login', methods=['GET', 'POST'])
 def admin_login():

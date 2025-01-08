@@ -82,7 +82,9 @@
                     <!-- Üst Kısım: Overall ve Pozisyon -->
                     <div class="card-header">
                         <div class="overall">{{ player.overall }}</div>
-                        <div class="position-badge">{{ player.position }}</div>
+                        <div class="position-badge" data-position="{{ player.position }}">
+                            {{ player.position }}
+                        </div>
                     </div>
 
                     <!-- Oyuncu Adı -->
@@ -92,27 +94,39 @@
                     <div class="stats-grid">
                         <div class="stat-item">
                             <span class="stat-label">PAC</span>
-                            <span class="stat-value {{ get_stat_class(player.stats.pace) }}">{{ player.stats.pace }}</span>
+                            <span class="stat-value {{ get_stat_class(player.stats.pace) }}">
+                                {{ player.stats.pace }}
+                            </span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">SHO</span>
-                            <span class="stat-value {{ get_stat_class(player.stats.shooting) }}">{{ player.stats.shooting }}</span>
+                            <span class="stat-value {{ get_stat_class(player.stats.shooting) }}">
+                                {{ player.stats.shooting }}
+                            </span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">PAS</span>
-                            <span class="stat-value {{ get_stat_class(player.stats.passing) }}">{{ player.stats.passing }}</span>
+                            <span class="stat-value {{ get_stat_class(player.stats.passing) }}">
+                                {{ player.stats.passing }}
+                            </span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">DRI</span>
-                            <span class="stat-value {{ get_stat_class(player.stats.dribbling) }}">{{ player.stats.dribbling }}</span>
+                            <span class="stat-value {{ get_stat_class(player.stats.dribbling) }}">
+                                {{ player.stats.dribbling }}
+                            </span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">DEF</span>
-                            <span class="stat-value {{ get_stat_class(player.stats.defending) }}">{{ player.stats.defending }}</span>
+                            <span class="stat-value {{ get_stat_class(player.stats.defending) }}">
+                                {{ player.stats.defending }}
+                            </span>
                         </div>
                         <div class="stat-item">
                             <span class="stat-label">PHY</span>
-                            <span class="stat-value {{ get_stat_class(player.stats.physical) }}">{{ player.stats.physical }}</span>
+                            <span class="stat-value {{ get_stat_class(player.stats.physical) }}">
+                                {{ player.stats.physical }}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -132,37 +146,44 @@
 
 .player-card {
     width: 100%;
-    background: linear-gradient(135deg, #2c3e50, #3498db);
-    border: 2px solid rgba(255,255,255,0.1);
     border-radius: 10px;
     padding: 15px;
     transition: all 0.3s ease;
     cursor: pointer;
     position: relative;
     overflow: hidden;
+    color: white;
 }
 
 .player-card:hover {
-    transform: translateY(-10px) scale(1.02);
-    transition: all 0.3s ease;
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
 }
 
-.player-card.elite {
-    background: linear-gradient(135deg, #8e44ad, #2980b9);
-    border: 2px solid #9b59b6;
-    animation: glowElite 2s infinite;
+/* Bronze kart (75 altı) */
+.player-card.bronze {
+    background: linear-gradient(135deg, #cd7f32, #a0522d);
+    border: 2px solid #8b4513;
 }
 
+/* Silver kart (75-81) */
+.player-card.silver {
+    background: linear-gradient(135deg, #c0c0c0, #808080);
+    border: 2px solid #696969;
+}
+
+/* Gold kart (82-87) */
 .player-card.gold {
-    background: linear-gradient(135deg, #f1c40f, #e67e22);
-    border: 2px solid #f39c12;
+    background: linear-gradient(135deg, #ffd700, #daa520);
+    border: 2px solid #b8860b;
     animation: glowGold 2s infinite;
 }
 
-.player-card.silver {
-    background: linear-gradient(135deg, #bdc3c7, #95a5a6);
-    border: 2px solid #7f8c8d;
-    animation: glowSilver 2s infinite;
+/* Elite kart (88+) */
+.player-card.elite {
+    background: linear-gradient(135deg, #9400d3, #4b0082);
+    border: 2px solid #800080;
+    animation: glowElite 3s infinite;
 }
 
 .card-header {
@@ -182,12 +203,26 @@
 }
 
 .position-badge {
-    background: linear-gradient(45deg, #3498db, #2980b9);
-    color: white;
     padding: 4px 10px;
     border-radius: 15px;
     font-weight: bold;
-    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+}
+
+.position-badge[data-position="Kaleci"] { 
+    background: linear-gradient(45deg, #e74c3c, #c0392b); 
+}
+
+.position-badge[data-position="Defans"] { 
+    background: linear-gradient(45deg, #3498db, #2980b9); 
+}
+
+.position-badge[data-position="Orta Saha"] { 
+    background: linear-gradient(45deg, #2ecc71, #27ae60); 
+}
+
+.position-badge[data-position="Forvet"] { 
+    background: linear-gradient(45deg, #f1c40f, #f39c12); 
 }
 
 .player-name {
@@ -241,36 +276,22 @@
     text-shadow: 0 0 10px rgba(231,76,60,0.5);
 }
 
+/* Animasyonlar */
 @keyframes glowElite {
     0%, 100% { 
-        box-shadow: 0 0 20px rgba(142,68,173,0.6);
-        transform: translateY(-5px);
+        box-shadow: 0 0 20px rgba(148,0,211,0.6);
     }
     50% { 
-        box-shadow: 0 0 30px rgba(142,68,173,0.8);
-        transform: translateY(-8px);
+        box-shadow: 0 0 30px rgba(148,0,211,0.8);
     }
 }
 
 @keyframes glowGold {
     0%, 100% { 
-        box-shadow: 0 0 20px rgba(241,196,15,0.6);
-        transform: translateY(-5px);
+        box-shadow: 0 0 15px rgba(255,215,0,0.6);
     }
     50% { 
-        box-shadow: 0 0 30px rgba(241,196,15,0.8);
-        transform: translateY(-8px);
-    }
-}
-
-@keyframes glowSilver {
-    0%, 100% { 
-        box-shadow: 0 0 20px rgba(189,195,199,0.6);
-        transform: translateY(-5px);
-    }
-    50% { 
-        box-shadow: 0 0 30px rgba(189,195,199,0.8);
-        transform: translateY(-8px);
+        box-shadow: 0 0 25px rgba(255,215,0,0.8);
     }
 }
 
@@ -302,11 +323,5 @@
         font-size: 0.85em;
     }
 }
-
-/* Pozisyona göre renkler */
-.position-badge:contains('Kaleci') { background: linear-gradient(45deg, #e74c3c, #c0392b); }
-.position-badge:contains('Defans') { background: linear-gradient(45deg, #3498db, #2980b9); }
-.position-badge:contains('Orta Saha') { background: linear-gradient(45deg, #2ecc71, #27ae60); }
-.position-badge:contains('Forvet') { background: linear-gradient(45deg, #f1c40f, #f39c12); }
 </style>
 {% endblock %} 

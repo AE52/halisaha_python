@@ -106,45 +106,30 @@ class Player:
     @staticmethod
     def get_all_active():
         try:
-            # Aktif oyuncuları getir
             active_players = list(players.find({"is_active": True}))
-            
-            # Her oyuncu için bilgileri düzenle
             formatted_players = []
+            
             for player in active_players:
                 # Temel bilgiler
+                stats = player.get('stats', {
+                    'pace': 70,
+                    'shooting': 70,
+                    'passing': 70,
+                    'dribbling': 70,
+                    'defending': 70,
+                    'physical': 70
+                })
+                
+                position = player.get('position', 'Orta Saha')
+                
                 player_data = {
                     '_id': str(player['_id']),
                     'name': player.get('name', 'İsimsiz'),
-                    'position': player.get('position', 'Belirsiz'),
-                    'stats': player.get('stats', {
-                        'pace': 70,
-                        'shooting': 70,
-                        'passing': 70,
-                        'dribbling': 70,
-                        'defending': 70,
-                        'physical': 70
-                    })
-                }
-
-                # Overall değerini hesapla
-                weights = {
-                    'Kaleci': {'pace': 0.1, 'shooting': 0, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.4, 'physical': 0.2},
-                    'Defans': {'pace': 0.2, 'shooting': 0.1, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.3, 'physical': 0.1},
-                    'Orta Saha': {'pace': 0.15, 'shooting': 0.2, 'passing': 0.25, 'dribbling': 0.2, 'defending': 0.1, 'physical': 0.1},
-                    'Forvet': {'pace': 0.2, 'shooting': 0.3, 'passing': 0.15, 'dribbling': 0.2, 'defending': 0.05, 'physical': 0.1}
+                    'position': position,
+                    'stats': stats,
+                    'overall': calculate_overall(stats, position)
                 }
                 
-                w = weights.get(player_data['position'], weights['Orta Saha'])
-                player_data['overall'] = int(
-                    player_data['stats']['pace'] * w['pace'] +
-                    player_data['stats']['shooting'] * w['shooting'] +
-                    player_data['stats']['passing'] * w['passing'] +
-                    player_data['stats']['dribbling'] * w['dribbling'] +
-                    player_data['stats']['defending'] * w['defending'] +
-                    player_data['stats']['physical'] * w['physical']
-                )
-
                 formatted_players.append(player_data)
             
             return formatted_players
@@ -355,17 +340,23 @@ class Match:
                     for player in match['teams'][team]:
                         player_info = Player.get_by_id(player['player_id'])
                         if player_info:
+                            # Oyuncu bilgilerini güncelle
+                            stats = player_info.get('stats', {
+                                'pace': 70,
+                                'shooting': 70,
+                                'passing': 70,
+                                'dribbling': 70,
+                                'defending': 70,
+                                'physical': 70
+                            })
+                            
+                            position = player_info.get('position', 'Orta Saha')
+                            
                             player.update({
                                 'name': player_info.get('name', 'İsimsiz'),
-                                'position': player_info.get('position', 'Belirsiz'),
-                                'stats': player_info.get('stats', {
-                                    'pace': 70,
-                                    'shooting': 70,
-                                    'passing': 70,
-                                    'dribbling': 70,
-                                    'defending': 70,
-                                    'physical': 70
-                                })
+                                'position': position,
+                                'stats': stats,
+                                'overall': calculate_overall(stats, position)
                             })
                 return match
             return None
@@ -462,3 +453,62 @@ class Match:
         except Exception as e:
             print(f"Oyuncu istatistikleri getirme hatası: {str(e)}")
             return None 
+
+# Overall hesaplama fonksiyonu
+def calculate_overall(stats, position):
+    # Pozisyona göre stat ağırlıkları
+    weights = {
+        'Kaleci': {
+            'pace': 0.05,      # Hız
+            'shooting': 0.05,   # Şut
+            'passing': 0.15,    # Pas
+            'dribbling': 0.05,  # Dribling
+            'defending': 0.50,  # Defans
+            'physical': 0.20    # Fizik
+        },
+        'Defans': {
+            'pace': 0.15,      # Hız
+            'shooting': 0.05,   # Şut
+            'passing': 0.15,    # Pas
+            'dribbling': 0.10,  # Dribling
+            'defending': 0.40,  # Defans
+            'physical': 0.15    # Fizik
+        },
+        'Orta Saha': {
+            'pace': 0.15,      # Hız
+            'shooting': 0.20,   # Şut
+            'passing': 0.25,    # Pas
+            'dribbling': 0.20,  # Dribling
+            'defending': 0.10,  # Defans
+            'physical': 0.10    # Fizik
+        },
+        'Forvet': {
+            'pace': 0.20,      # Hız
+            'shooting': 0.35,   # Şut
+            'passing': 0.15,    # Pas
+            'dribbling': 0.15,  # Dribling
+            'defending': 0.05,  # Defans
+            'physical': 0.10    # Fizik
+        }
+    }
+
+    # Varsayılan olarak Orta Saha ağırlıklarını kullan
+    w = weights.get(position, weights['Orta Saha'])
+    
+    # Overall hesapla
+    overall = (
+        stats['pace'] * w['pace'] +
+        stats['shooting'] * w['shooting'] +
+        stats['passing'] * w['passing'] +
+        stats['dribbling'] * w['dribbling'] +
+        stats['defending'] * w['defending'] +
+        stats['physical'] * w['physical']
+    )
+    
+    # Bonus ekle
+    if all(stats[stat] >= 80 for stat in ['pace', 'shooting', 'passing']):
+        overall += 3  # Hücum bonusu
+    if all(stats[stat] >= 80 for stat in ['defending', 'physical']):
+        overall += 3  # Defans bonusu
+        
+    return int(overall) 
