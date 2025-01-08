@@ -37,54 +37,202 @@ try:
 except Exception as e:
     print(f"MongoDB bağlantı hatası: {str(e)}")
 
-# Decorator'ları en başa alalım
+# Decorator'ları en üste taşıyalım
+def admin_api_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not is_admin():
+            return jsonify({
+                "error": "Bu işlem için admin yetkisi gereklidir",
+                "redirect_url": url_for('admin_login')
+            }), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_page_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not is_admin():
+            flash('Bu sayfaya erişim için admin yetkisi gereklidir!', 'error')
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Yetkilendirme yardımcı fonksiyonları
+def get_user_type():
+    """Kullanıcı tipini ve ID'sini döndür (admin, player veya None)"""
+    try:
+        # Admin kontrolü
+        admin_token = request.cookies.get('jwt_token')
+        if admin_token:
+            try:
+                jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
+                return 'admin', None
+            except:
+                pass
+
+        # Oyuncu kontrolü
+        player_token = request.cookies.get('player_token')
+        if player_token and 'player_id' in session:
+            try:
+                data = jwt.decode(player_token, app.config['SECRET_KEY'], algorithms=["HS256"])
+                player_id = data.get('player_id')
+                if player_id and player_id == session['player_id']:
+                    return 'player', player_id
+            except:
+                pass
+
+    except Exception as e:
+        print(f"Yetkilendirme hatası: {str(e)}")
+    
+    return None, None
+
+def is_admin():
+    """Admin yetkisi kontrolü"""
+    try:
+        token = request.cookies.get('jwt_token')
+        if token:
+            decoded = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
+            return decoded.get('admin', False)
+    except Exception as e:
+        print(f"Admin kontrol hatası: {str(e)}")
+    return False
+
+def is_player():
+    """Oyuncu girişi kontrolü"""
+    user_type, _ = get_user_type()
+    return user_type == 'player'
+
+def get_current_user():
+    """Mevcut kullanıcı bilgilerini döndür"""
+    user_type, user_id = get_user_type()
+    if user_type == 'admin':
+        return {'is_admin': True, 'is_logged_in': False, 'current_user': None}
+    elif user_type == 'player' and user_id:
+        player = Player.get_by_id(user_id)
+        if player:
+            return {'is_admin': False, 'is_logged_in': True, 'current_user': player}
+    return {'is_admin': False, 'is_logged_in': False, 'current_user': None}
+
+# Admin decorator'ı güncellendi
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        token = request.cookies.get('jwt_token')
-        
-        if not token:
-            flash('Yönetici girişi gerekli', 'error')
+        if not is_admin():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({"error": "Bu işlem için admin yetkisi gereklidir"}), 403
+            flash('Bu sayfaya erişim için admin yetkisi gereklidir!', 'error')
             return redirect(url_for('admin_login'))
-
-        try:
-            # Token'ı doğrula
-            jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            return f(*args, **kwargs)
-        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
-            flash('Oturum süresi doldu veya geçersiz', 'error')
-            response = make_response(redirect(url_for('admin_login')))
-            response.delete_cookie('jwt_token')  # Token'ı sil
-            return response
-            
+        return f(*args, **kwargs)
     return decorated_function
 
+# Oyuncu decorator'ı güncellendi
 def player_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        token = request.cookies.get('player_jwt')
-        
-        if not token:
-            flash(get_translation('login_required'), 'error')
+        if not is_player():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({"error": "Bu işlem için oyuncu girişi gereklidir"}), 403
+            flash('Bu işlem için giriş yapmalısınız!', 'error')
             return redirect(url_for('player_login'))
-
-        try:
-            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            if 'player_id' not in data:
-                raise jwt.InvalidTokenError
-                
-            # Session'ı güncelle
-            session['player_id'] = data['player_id']
-            return f(*args, **kwargs)
-            
-        except jwt.ExpiredSignatureError:
-            flash(get_translation('session_expired'), 'error')
-            return redirect(url_for('player_login'))
-        except jwt.InvalidTokenError:
-            flash(get_translation('invalid_session'), 'error')
-            return redirect(url_for('player_login'))
-            
+        return f(*args, **kwargs)
     return decorated_function
+
+# Context processor güncellendi
+@app.context_processor
+def inject_user():
+    return get_current_user()
+
+# Giriş route'ları güncellendi
+@app.route('/admin-login', methods=['GET', 'POST'])
+def admin_login():
+    # Zaten giriş yapılmışsa yönlendir
+    user_type, _ = get_user_type()
+    if user_type:
+        if user_type == 'admin':
+            return redirect(url_for('index'))
+        flash('Önce mevcut hesaptan çıkış yapmalısınız.', 'warning')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        api_key = request.form.get('api_key')
+        if api_key == API_KEY:
+            # JWT token oluştur - admin: True ekle
+            token = jwt.encode({
+                'admin': True,  # Bu önemli!
+                'exp': datetime.utcnow() + timedelta(days=7)
+            }, app.config['SECRET_KEY'])
+            
+            response = make_response(redirect(url_for('index')))
+            response.set_cookie('jwt_token', token, httponly=True, secure=True, samesite='Lax')
+            flash('Admin olarak giriş yapıldı', 'success')
+            return response
+        else:
+            flash('Geçersiz API key!', 'error')
+    return render_template('admin_login.html')
+
+@app.route('/player-login', methods=['GET', 'POST'])
+def player_login():
+    # Zaten giriş yapılmışsa yönlendir
+    user_type, _ = get_user_type()
+    if user_type:
+        if user_type == 'player':
+            return redirect(url_for('index'))
+        flash('Önce mevcut hesaptan çıkış yapmalısınız.', 'warning')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        tc_no = request.form.get('tc_no')
+        player = Player.get_by_tc(tc_no)
+        
+        if player:
+            token = jwt.encode({
+                'player_id': str(player['_id']),
+                'exp': datetime.utcnow() + timedelta(days=7)
+            }, app.config['SECRET_KEY'])
+            
+            response = make_response(redirect(url_for('index')))
+            response.set_cookie('player_token', token, httponly=True, secure=True, samesite='Lax')
+            session['player_id'] = str(player['_id'])
+            flash('Başarıyla giriş yapıldı', 'success')
+            return response
+        else:
+            flash('TC kimlik numarası bulunamadı!', 'error')
+    return render_template('player_login.html')
+
+@app.route('/logout')
+def logout():
+    response = make_response(redirect(url_for('index')))
+    response.delete_cookie('jwt_token')
+    response.delete_cookie('player_token')
+    session.clear()
+    flash('Başarıyla çıkış yapıldı', 'success')
+    return response
+
+@app.route('/')
+def index():
+    # Admin kontrolü
+    is_admin = bool(request.cookies.get('jwt_token'))
+    
+    # Oyuncu kontrolü
+    player_token = request.cookies.get('player_token')
+    is_logged_in = False
+    current_user = None
+    
+    if player_token:
+        try:
+            data = jwt.decode(player_token, app.config['SECRET_KEY'], algorithms=["HS256"])
+            player_id = data.get('player_id')
+            if player_id:
+                current_user = Player.get_by_id(player_id)
+                is_logged_in = True
+        except:
+            pass
+    
+    return render_template('index.html', 
+                         is_admin=is_admin,
+                         is_logged_in=is_logged_in,
+                         current_user=current_user)
 
 # Yardımcı fonksiyonlar
 def get_translation(key, **kwargs):
@@ -153,56 +301,6 @@ def get_stat_class(value):
             return 'low'        # Kırmızı (Geliştirilmeli)
     except (TypeError, ValueError):
         return 'low'
-
-@app.route('/')
-def index():
-    # Admin kontrolü
-    is_admin = bool(request.cookies.get('jwt_token'))
-    
-    # Oyuncu kontrolü
-    player_token = request.cookies.get('player_token')
-    is_logged_in = False
-    current_user = None
-    
-    if player_token:
-        try:
-            data = jwt.decode(player_token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            player_id = data.get('player_id')
-            if player_id:
-                current_user = Player.get_by_id(player_id)
-                is_logged_in = True
-        except:
-            pass
-    
-    return render_template('index.html', 
-                         is_admin=is_admin,
-                         is_logged_in=is_logged_in,
-                         current_user=current_user)
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    # Oyuncu girişi yapılmışsa admin girişine izin verme
-    if 'player_id' in session:
-        flash(get_translation('player_already_logged_in'), 'warning')
-        return redirect(url_for('index'))
-
-    if request.method == 'POST':
-        data = request.get_json()
-        api_key = data.get('api_key')
-        
-        if api_key == app.config['ADMIN_API_KEY']:
-            token = jwt.encode({
-                'admin': True,
-                'exp': datetime.utcnow() + timedelta(hours=24)
-            }, app.config['SECRET_KEY'])
-            
-            response = jsonify({'access_token': token})
-            response.set_cookie('jwt_token', token, httponly=True, secure=True)
-            return response
-        
-        return jsonify({'message': get_translation('invalid_api_key')}), 401
-    
-    return render_template('login.html')
 
 @app.route('/api/players', methods=['POST'])
 @admin_required
@@ -698,38 +796,6 @@ def before_request():
 def serve_sound(filename):
     return send_from_directory('static/sounds', filename)
 
-@app.route('/player-login', methods=['GET', 'POST'])
-def player_login():
-    if request.method == 'POST':
-        tc_no = request.form.get('tc_no')
-        
-        if not tc_no:
-            flash('TC Kimlik No gerekli', 'error')
-            return redirect(url_for('player_login'))
-            
-        player = Player.get_by_tc(tc_no)
-        
-        if player:
-            # JWT token oluştur
-            token = jwt.encode({
-                'player_id': str(player['_id']),
-                'exp': datetime.utcnow() + timedelta(days=7)
-            }, app.config['SECRET_KEY'])
-            
-            # Session'a oyuncu bilgilerini kaydet
-            session['player_id'] = str(player['_id'])
-            
-            # Token'ı cookie'ye kaydet ve yönlendir
-            response = make_response(redirect(url_for('index')))
-            response.set_cookie('player_token', token, httponly=True)
-            flash('Başarıyla giriş yaptınız!', 'success')
-            return response
-        else:
-            flash('Geçersiz TC Kimlik No', 'error')
-            return redirect(url_for('player_login'))
-    
-    return render_template('player_login.html')
-
 @app.route('/player-logout')
 def player_logout():
     session.pop('player_id', None)
@@ -738,35 +804,56 @@ def player_logout():
     flash('Başarıyla çıkış yaptınız', 'success')
     return response
 
-@app.route('/api/players/<id>/comments', methods=['POST'])
-def add_comment(id):
+@app.route('/api/players/<id>/comments', methods=['POST', 'DELETE'])
+def manage_comments(id):
     try:
-        if not session.get('player_id'):
-            return jsonify({"error": "Yorum yapmak için giriş yapmalısınız"}), 401
+        # Admin kontrolü
+        admin_token = request.cookies.get('jwt_token')
+        is_admin = False
+        if admin_token:
+            try:
+                jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
+                is_admin = True
+            except:
+                pass
 
-        data = request.json
-        comment_text = data.get('text')
-        
-        if not comment_text:
-            return jsonify({"error": "Yorum boş olamaz"}), 400
+        if request.method == 'POST':
+            # Yorum ekleme
+            if not is_admin and not session.get('player_id'):
+                return jsonify({"error": "Yorum yapmak için giriş yapmalısınız"}), 401
 
-        # Yorumu ekle
-        comment = {
-            "_id": str(ObjectId()),
-            "player_id": id,
-            "commenter_id": session['player_id'],
-            "commenter_name": Player.get_by_id(session['player_id'])['name'],
-            "text": comment_text,
-            "created_at": datetime.now(timezone.utc),
-            "is_admin": False
-        }
-        
-        db.comments.insert_one(comment)
-        
-        # Yanıt için tarihi formatlı string'e çevir
-        comment['created_at'] = comment['created_at'].strftime('%d/%m/%Y %H:%M')
-        
-        return jsonify(comment)
+            data = request.json
+            comment_text = data.get('text')
+            
+            if not comment_text:
+                return jsonify({"error": "Yorum boş olamaz"}), 400
+
+            # Yorumu ekle
+            comment = {
+                "_id": str(ObjectId()),
+                "player_id": id,
+                "commenter_id": "admin" if is_admin else session['player_id'],
+                "commenter_name": "Admin" if is_admin else Player.get_by_id(session['player_id'])['name'],
+                "text": comment_text,
+                "created_at": datetime.now(timezone.utc),
+                "is_admin": is_admin
+            }
+            
+            db.comments.insert_one(comment)
+            comment['created_at'] = comment['created_at'].strftime('%d/%m/%Y %H:%M')
+            return jsonify(comment)
+
+        elif request.method == 'DELETE':
+            # Yorum silme (sadece admin)
+            if not is_admin:
+                return jsonify({"error": "Yorum silme yetkisi yok"}), 403
+
+            comment_id = request.args.get('comment_id')
+            if not comment_id:
+                return jsonify({"error": "Yorum ID'si gerekli"}), 400
+
+            db.comments.delete_one({"_id": comment_id})
+            return jsonify({"success": True})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -973,26 +1060,102 @@ def get_stat_class(value):
     except (TypeError, ValueError):
         return 'low'
 
-@app.route('/admin-login', methods=['GET', 'POST'])
-def admin_login():
-    if request.method == 'POST':
-        api_key = request.form.get('api_key')
-        if api_key == API_KEY:
-            # JWT token oluştur
-            token = jwt.encode({
-                'admin': True,
-                'exp': datetime.utcnow() + timedelta(days=7)
-            }, app.config['SECRET_KEY'])
-            
-            # Token'ı cookie'ye kaydet ve yönlendir
-            response = make_response(redirect(url_for('index')))
-            response.set_cookie('jwt_token', token, httponly=True)
-            return response
+@app.route('/api/players/<id>/reaction', methods=['POST'])
+def add_reaction(id):
+    try:
+        # Admin kontrolü ekle
+        admin_token = request.cookies.get('jwt_token')
+        is_admin = False
+        if admin_token:
+            try:
+                jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
+                is_admin = True
+            except:
+                pass
+
+        # Normal kullanıcı kontrolü
+        if not is_admin and not session.get('player_id'):
+            return jsonify({"error": "Beğeni/beğenmeme için giriş yapmalısınız"}), 401
+
+        data = request.json
+        is_like = data.get('is_like')
+        
+        # Admin veya kullanıcı ID'sini belirle
+        user_id = "admin" if is_admin else session.get('player_id')
+        
+        # Reaksiyonu ekle/güncelle
+        success = Player.add_or_update_reaction(id, user_id, is_like, is_admin)
+        
+        if success:
+            reactions = Player.get_reactions(id)
+            return jsonify(reactions)
         else:
-            flash('Geçersiz API key!', 'error')
-            return redirect(url_for('admin_login'))
-    
-    return render_template('admin_login.html')
+            return jsonify({"error": "Beğeni eklenemedi"}), 500
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/players/<id>/reactions/update', methods=['POST'])
+@admin_api_required
+def update_reactions(id):
+    try:
+        data = request.json
+        likes = int(data.get('likes', 0))
+        dislikes = int(data.get('dislikes', 0))
+        
+        result = reactions.update_one(
+            {"player_id": id},
+            {
+                "$set": {
+                    "likes": likes,
+                    "dislikes": dislikes,
+                    "updated_at": datetime.now(timezone.utc)
+                }
+            },
+            upsert=True
+        )
+        
+        if result.modified_count > 0 or result.upserted_id:
+            return jsonify({
+                "success": True,
+                "likes": likes,
+                "dislikes": dislikes
+            })
+        else:
+            return jsonify({"error": "Güncelleme başarısız"}), 500
+            
+    except Exception as e:
+        print(f"Reaksiyon güncelleme hatası: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/players/<id>/update-tc', methods=['POST'])
+@admin_api_required
+def update_player_tc(id):
+    try:
+        data = request.json
+        new_tc = data.get('tc_no')
+        
+        if not new_tc:
+            return jsonify({"error": "TC kimlik numarası gerekli"}), 400
+            
+        result = players.update_one(
+            {"_id": ObjectId(id)},
+            {"$set": {"tc_no": new_tc}}
+        )
+        
+        if result.modified_count > 0:
+            return jsonify({
+                "success": True, 
+                "message": "TC kimlik numarası güncellendi"
+            })
+        else:
+            return jsonify({
+                "error": "Oyuncu bulunamadı veya güncelleme başarısız"
+            }), 404
+            
+    except Exception as e:
+        print(f"TC güncelleme hatası: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 # Health check endpoint'i ekle
 @app.route('/health')
@@ -1009,70 +1172,6 @@ def page_not_found(e):
     return render_template('404.html', 
                          error_message="İstediğiniz sayfa bulunamadı.",
                          error_details=str(e)), 404
-
-@app.context_processor
-def inject_user():
-    try:
-        # Admin kontrolü
-        admin_token = request.cookies.get('jwt_token')
-        if admin_token:
-            try:
-                jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
-                return {'is_admin': True, 'is_logged_in': False, 'current_user': None}
-            except:
-                pass
-
-        # Oyuncu kontrolü
-        player_token = request.cookies.get('player_token')
-        if player_token:
-            try:
-                data = jwt.decode(player_token, app.config['SECRET_KEY'], algorithms=["HS256"])
-                player_id = data.get('player_id')
-                if player_id:
-                    player = Player.get_by_id(player_id)
-                    if player:
-                        return {
-                            'is_admin': False,
-                            'is_logged_in': True,
-                            'current_user': player
-                        }
-            except:
-                pass
-
-        return {
-            'is_admin': False,
-            'is_logged_in': False,
-            'current_user': None
-        }
-    except Exception as e:
-        print(f"inject_user hatası: {str(e)}")
-        return {
-            'is_admin': False,
-            'is_logged_in': False,
-            'current_user': None
-        }
-
-@app.route('/api/players/<id>/reaction', methods=['POST'])
-def add_reaction(id):
-    try:
-        if not session.get('player_id'):
-            return jsonify({"error": "Beğeni/beğenmeme için giriş yapmalısınız"}), 401
-
-        data = request.json
-        is_like = data.get('is_like')
-        
-        # Reaksiyonu ekle/güncelle
-        success = Player.add_or_update_reaction(id, session['player_id'], is_like)
-        
-        if success:
-            # Güncel beğeni sayılarını döndür
-            reactions = Player.get_reactions(id)
-            return jsonify(reactions)
-        else:
-            return jsonify({"error": "Beğeni eklenemedi"}), 500
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080))) 

@@ -190,18 +190,29 @@
         <div class="col-lg-4">
             <!-- Beğeni/Beğenmeme Sistemi -->
             <div class="reactions-section">
-                <h4 class="reactions-title"><i class="fas fa-heart"></i> Sevenler / Sevmeyenler</h4>
+                <h4 class="reactions-title">
+                    <i class="fas fa-heart"></i> Sevenler / Sevmeyenler
+                    {% if is_admin %}
+                    <button class="btn btn-sm btn-edit" onclick="editReactions()">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    {% endif %}
+                </h4>
                 <div class="reactions-container">
                     <!-- Beğeni Daire Grafiği -->
                     <div class="rating-circle">
                         <div class="rating-numbers">
-                            <div class="likes">
+                            <div class="likes" {% if is_admin %}onclick="editLikes()"{% endif %}>
                                 <i class="fas fa-thumbs-up"></i>
-                                <span id="likes-count">{{ like_count }}</span>
+                                <span id="likes-count" class="{% if is_admin %}admin-editable{% endif %}">
+                                    {{ like_count }}
+                                </span>
                             </div>
-                            <div class="dislikes">
+                            <div class="dislikes" {% if is_admin %}onclick="editDislikes()"{% endif %}>
                                 <i class="fas fa-thumbs-down"></i>
-                                <span id="dislikes-count">{{ dislike_count }}</span>
+                                <span id="dislikes-count" class="{% if is_admin %}admin-editable{% endif %}">
+                                    {{ dislike_count }}
+                                </span>
                             </div>
                         </div>
                         <div class="circle-chart">
@@ -234,7 +245,7 @@
                     </div>
 
                     <!-- Beğeni Butonları -->
-                    {% if is_logged_in %}
+                    {% if is_logged_in or is_admin %}
                     <div class="reaction-buttons">
                         <button class="btn-reaction like {{ 'active' if current_user_reaction == 'like' }}" 
                                 onclick="handleReaction('like')">
@@ -258,7 +269,7 @@
             <!-- Yorumlar Kartı -->
             <div class="comments-card mt-4">
                 <h4><i class="fas fa-comments"></i> Yorumlar</h4>
-                {% if is_logged_in %}
+                {% if is_logged_in or is_admin %}
                 <form id="commentForm" class="comment-form">
                     <div class="input-group">
                         <input type="text" class="form-control" id="commentText" placeholder="Yorum yaz...">
@@ -270,13 +281,19 @@
                 {% endif %}
                 <div class="comments-list" id="commentsList">
                     {% for comment in comments %}
-                    <div class="comment-item {{ 'admin-comment' if comment.is_admin }}">
+                    <div class="comment-item {{ 'admin-comment' if comment.is_admin }}" data-id="{{ comment._id }}">
                         <div class="comment-header">
                             {% if comment.is_admin %}
                             <i class="fas fa-shield-alt"></i>
                             {% endif %}
                             <strong>{{ comment.commenter_name }}</strong>
                             <small>{{ comment.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+                            {% if is_admin %}
+                            <button class="btn btn-sm btn-danger delete-comment" 
+                                    onclick="deleteComment('{{ comment._id }}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            {% endif %}
                         </div>
                         <p>{{ comment.text }}</p>
                     </div>
@@ -587,12 +604,56 @@
 }
 
 .admin-comment {
-    background: rgba(46,204,113,0.1);
+    background: linear-gradient(135deg, rgba(46,204,113,0.1), rgba(46,204,113,0.2));
     border-left: 3px solid #2ECC71;
+    box-shadow: 0 0 15px rgba(46,204,113,0.2);
+    animation: glow 2s infinite alternate;
+}
+
+.admin-comment .comment-header {
+    background: rgba(46,204,113,0.1);
+    padding: 8px;
+    border-radius: 5px;
 }
 
 .admin-comment .fa-shield-alt {
     color: #2ECC71;
+    text-shadow: 0 0 5px rgba(46,204,113,0.5);
+}
+
+/* Admin düzenleme stilleri */
+.admin-editable {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.admin-editable:hover {
+    transform: scale(1.1);
+    text-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
+
+.btn-edit {
+    background: none;
+    border: none;
+    color: #2ECC71;
+    padding: 5px;
+    margin-left: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-edit:hover {
+    transform: scale(1.1);
+    text-shadow: 0 0 10px rgba(46,204,113,0.5);
+}
+
+@keyframes glow {
+    from {
+        box-shadow: 0 0 10px rgba(46,204,113,0.2);
+    }
+    to {
+        box-shadow: 0 0 20px rgba(46,204,113,0.4);
+    }
 }
 
 /* Responsive Düzenlemeler */
@@ -762,6 +823,27 @@
     transform: scale(1.1);
     box-shadow: 0 0 20px rgba(0,0,0,0.3);
 }
+
+/* Admin yorum stilleri */
+.admin-comment {
+    background: rgba(46,204,113,0.1);
+    border-left: 3px solid #2ECC71;
+}
+
+.admin-comment .fa-shield-alt {
+    color: #2ECC71;
+}
+
+.delete-comment {
+    float: right;
+    padding: 2px 8px;
+    font-size: 0.8em;
+}
+
+.delete-comment:hover {
+    background: #dc3545;
+    color: white;
+}
 </style>
 
 <script>
@@ -882,5 +964,141 @@ document.getElementById('commentForm')?.addEventListener('submit', async functio
         alert(error.message || 'Yorum gönderilemedi. Lütfen tekrar deneyin.');
     }
 });
+
+// Yorum silme fonksiyonu (admin için)
+async function deleteComment(commentId) {
+    if (!confirm('Bu yorumu silmek istediğinize emin misiniz?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/players/{{ player._id }}/comments?comment_id=${commentId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Yorum silinemedi');
+        }
+
+        // Yorumu DOM'dan kaldır
+        document.querySelector(`.comment-item[data-id="${commentId}"]`).remove();
+
+    } catch (error) {
+        console.error('Yorum silme hatası:', error);
+        alert('Yorum silinemedi. Lütfen tekrar deneyin.');
+    }
+}
+
+// Admin beğeni düzenleme fonksiyonları
+function editLikes() {
+    if (!{{ 'true' if is_admin else 'false' }}) return;
+    
+    const currentLikes = parseInt(document.getElementById('likes-count').textContent);
+    const newLikes = prompt('Yeni beğeni sayısını girin:', currentLikes);
+    
+    if (newLikes !== null && !isNaN(newLikes)) {
+        updateReactionCounts(parseInt(newLikes), parseInt(document.getElementById('dislikes-count').textContent));
+    }
+}
+
+function editDislikes() {
+    if (!{{ 'true' if is_admin else 'false' }}) return;
+    
+    const currentDislikes = parseInt(document.getElementById('dislikes-count').textContent);
+    const newDislikes = prompt('Yeni beğenmeme sayısını girin:', currentDislikes);
+    
+    if (newDislikes !== null && !isNaN(newDislikes)) {
+        updateReactionCounts(parseInt(document.getElementById('likes-count').textContent), parseInt(newDislikes));
+    }
+}
+
+// TC güncelleme fonksiyonu
+async function updateTC(playerId) {
+    try {
+        const newTC = prompt('Yeni TC kimlik numarasını girin:');
+        if (!newTC) return;
+
+        const response = await fetch(`/api/players/${playerId}/update-tc`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                tc_no: newTC
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            if (response.status === 403 && data.redirect_url) {
+                window.location.href = data.redirect_url;
+                return;
+            }
+            throw new Error(data.error || 'TC güncellenemedi');
+        }
+
+        alert('TC kimlik numarası başarıyla güncellendi');
+        location.reload();
+
+    } catch (error) {
+        console.error('TC güncelleme hatası:', error);
+        alert(error.message || 'TC güncellenemedi. Lütfen tekrar deneyin.');
+    }
+}
+
+// Reaksiyon güncelleme fonksiyonu
+async function updateReactionCounts(likes, dislikes) {
+    try {
+        const response = await fetch(`/api/players/{{ player._id }}/reactions/update`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                likes: likes,
+                dislikes: dislikes
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            if (response.status === 403 && data.redirect_url) {
+                window.location.href = data.redirect_url;
+                return;
+            }
+            throw new Error(data.error || 'Beğeni sayıları güncellenemedi');
+        }
+
+        // UI güncelleme
+        document.getElementById('likes-count').textContent = data.likes;
+        document.getElementById('dislikes-count').textContent = data.dislikes;
+
+        // Yüzdeleri güncelle
+        const total = data.likes + data.dislikes;
+        const likePercent = total > 0 ? (data.likes / total * 100) : 0;
+        const dislikePercent = total > 0 ? (data.dislikes / total * 100) : 0;
+
+        document.getElementById('like-percent').textContent = `%${likePercent.toFixed(1)}`;
+        document.getElementById('dislike-percent').textContent = `%${dislikePercent.toFixed(1)}`;
+
+        // SVG path'leri güncelle
+        document.querySelector('.circle-like').setAttribute('stroke-dasharray', `${likePercent}, 100`);
+        document.querySelector('.circle-dislike').setAttribute('stroke-dasharray', `${dislikePercent}, 100`);
+        document.querySelector('.circle-dislike').setAttribute('transform', `rotate(${likePercent * 3.6} 18 18)`);
+
+    } catch (error) {
+        console.error('Güncelleme hatası:', error);
+        alert(error.message || 'Beğeni sayıları güncellenemedi. Lütfen tekrar deneyin.');
+    }
+}
 </script>
 {% endblock %} 
