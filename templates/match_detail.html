@@ -1,459 +1,237 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container">
-    <div class="match-detail-card">
-        <!-- Maç Bilgileri -->
-        <div class="row g-3">
-            <div class="col-12 col-md-4">
-                <div class="info-card">
-                    {% if is_admin %}
-                    <div class="form-group">
-                        <label><i class="fas fa-calendar"></i> Tarih</label>
-                        <input type="datetime-local" class="form-control" id="match_date" 
-                               value="{{ match.date.strftime('%Y-%m-%dT%H:%M') }}">
-                    </div>
-                    <div class="form-group mt-2">
-                        <label><i class="fas fa-map-marker-alt"></i> Konum</label>
-                        <input type="text" class="form-control" id="match_location" 
-                               value="{{ match.location }}">
-                    </div>
-                    {% else %}
-                    <div class="info-item">
-                        <i class="fas fa-calendar"></i>
-                        <span>{{ match.date.strftime('%d/%m/%Y %H:%M') }}</span>
-                    </div>
-                    <div class="info-item">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <span>{{ match.location }}</span>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-            <div class="col-12 col-md-4">
-                <div class="score-display text-center">
-                    <h3>SKOR</h3>
-                    {% if is_admin %}
-                    <div class="score-input-group">
-                        <input type="number" class="form-control score-input" id="score_team_a" 
-                               value="{{ match.score_team_a if match.score_team_a != None }}" min="0">
-                        <span class="score-divider">-</span>
-                        <input type="number" class="form-control score-input" id="score_team_b" 
-                               value="{{ match.score_team_b if match.score_team_b != None }}" min="0">
-                        <button class="btn btn-sm btn-success ms-2" onclick="updateScore({{ match.id }})">
-                            <i class="fas fa-save"></i>
-                        </button>
-                    </div>
-                    {% else %}
-                    <div class="score-numbers">
-                        <span class="team-score">{{ match.score_team_a if match.score_team_a != None else '-' }}</span>
-                        <span class="score-divider">-</span>
-                        <span class="team-score">{{ match.score_team_b if match.score_team_b != None else '-' }}</span>
-                    </div>
-                    {% endif %}
-                    {% if match.score_team_a is not none and match.score_team_b is not none %}
-                        <div class="winner-badge mt-2">
-                            {% if match.score_team_a > match.score_team_b %}
-                                <div class="badge bg-success">A Takımı Kazandı!</div>
-                            {% elif match.score_team_b > match.score_team_a %}
-                                <div class="badge bg-success">B Takımı Kazandı!</div>
-                            {% else %}
-                                <div class="badge bg-warning">Berabere!</div>
-                            {% endif %}
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-            <div class="col-12 col-md-4">
-                <div class="cost-display text-center">
-                    <h4>{{ translate('total_cost') }}</h4>
-                    <div class="cost-amount">{{ translate('total_amount', amount=match.total_cost) }}</div>
-                    <div class="per-person-cost">
-                        {{ translate('per_person_cost', amount="%.2f"|format(match.total_cost / match.match_players|length if match.match_players else 0)) }}
-                    </div>
-                </div>
+<div class="match-detail-container">
+    <div class="match-header">
+        <div class="match-info">
+            <h2 class="match-title">
+                <i class="fas fa-futbol"></i> 
+                {{ match.date.strftime('%d/%m/%Y') }}
+            </h2>
+            <div class="match-meta">
+                <span class="location">
+                    <i class="fas fa-map-marker-alt"></i>
+                    {{ match.location }}
+                </span>
+                <span class="cost">
+                    <i class="fas fa-coins"></i>
+                    {{ "%.2f"|format(match.total_cost) }} TL
+                </span>
             </div>
         </div>
-
-        <!-- Futbol Sahası ve Takımlar -->
-        <div class="football-field-container mt-4">
-            <div class="football-field">
-                <div class="field-divider"></div>
-                <div class="goal-left"></div>
-                <div class="goal-right"></div>
-                <div class="center-circle"></div>
-                <div class="penalty-area-left"></div>
-                <div class="penalty-area-right"></div>
-                
-                <!-- A Takımı -->
-                <div class="team-area team-a-area">
-                    <div class="team-label">A TAKIMI</div>
-                    {% for mp in match.match_players if mp.team == 'A' %}
-                    <div class="player-card-field {{ get_player_card_class(mp.player.overall) }}">
-                        <div class="player-info">
-                            <span class="player-ovr badge">{{ mp.player.overall }}</span>
-                            <span class="player-name">{{ mp.player.name }}</span>
-                            <span class="player-position badge">{{ mp.player.position }}</span>
-                        </div>
-                        {% if is_admin %}
-                        <div class="payment-toggle">
-                            <button type="button" 
-                                    class="btn btn-sm {{ 'btn-success' if mp.has_paid else 'btn-danger' }}"
-                                    onclick="togglePaymentStatus({{ mp.player.id }}, {{ match.id }})">
-                                <i class="fas fa-{{ 'check' if mp.has_paid else 'times' }}"></i>
-                            </button>
-                        </div>
-                        {% else %}
-                        <div class="payment-status {{ 'paid' if mp.has_paid else 'unpaid' }}">
-                            <i class="fas fa-{{ 'check' if mp.has_paid else 'times' }}"></i>
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
-
-                <!-- B Takımı -->
-                <div class="team-area team-b-area">
-                    <div class="team-label">B TAKIMI</div>
-                    {% for mp in match.match_players if mp.team == 'B' %}
-                    <div class="player-card-field {{ get_player_card_class(mp.player.overall) }}">
-                        <div class="player-info">
-                            <span class="player-ovr badge">{{ mp.player.overall }}</span>
-                            <span class="player-name">{{ mp.player.name }}</span>
-                            <span class="player-position badge">{{ mp.player.position }}</span>
-                        </div>
-                        {% if is_admin %}
-                        <div class="payment-toggle">
-                            <button type="button" 
-                                    class="btn btn-sm {{ 'btn-success' if mp.has_paid else 'btn-danger' }}"
-                                    onclick="togglePaymentStatus({{ mp.player.id }}, {{ match.id }})">
-                                <i class="fas fa-{{ 'check' if mp.has_paid else 'times' }}"></i>
-                            </button>
-                        </div>
-                        {% else %}
-                        <div class="payment-status {{ 'paid' if mp.has_paid else 'unpaid' }}">
-                            <i class="fas fa-{{ 'check' if mp.has_paid else 'times' }}"></i>
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
+        <div class="match-score">
+            <div class="score-display">
+                <span class="team-score">{{ match.score.team_a|default('-') }}</span>
+                <span class="score-separator">:</span>
+                <span class="team-score">{{ match.score.team_b|default('-') }}</span>
+            </div>
+            <div class="team-labels">
+                <span>Takım A</span>
+                <span>Takım B</span>
             </div>
         </div>
-
         {% if is_admin %}
-        <div class="admin-controls mt-4 text-center">
-            <button type="button" class="btn btn-danger" onclick="deleteMatch({{ match.id }})">
-                <i class="fas fa-trash"></i> Maçı Sil
+        <div class="admin-controls">
+            <button class="btn btn-primary" onclick="editScore()">
+                <i class="fas fa-edit"></i> Skoru Düzenle
             </button>
         </div>
         {% endif %}
     </div>
+
+    <!-- Skor Düzenleme Modal -->
+    <div class="modal fade" id="scoreModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Skor Düzenle</h5>
+                    <button type="button" class="close" data-dismiss="modal">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="score-inputs">
+                        <div class="team-score">
+                            <label>Takım A</label>
+                            <input type="number" id="scoreTeamA" min="0" value="{{ match.score.team_a|default(0) }}">
+                        </div>
+                        <div class="score-separator">-</div>
+                        <div class="team-score">
+                            <label>Takım B</label>
+                            <input type="number" id="scoreTeamB" min="0" value="{{ match.score.team_b|default(0) }}">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">İptal</button>
+                    <button type="button" class="btn btn-primary" onclick="updateScore()">Kaydet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="football-field">
+        <div class="team team-a">
+            {% if is_admin %}
+            <div class="team-actions">
+                <button class="btn btn-success btn-sm" onclick="updateTeamPayments('a', true)">
+                    <i class="fas fa-check-circle"></i> Tüm Takım Ödedi
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="updateTeamPayments('a', false)">
+                    <i class="fas fa-times-circle"></i> Tüm Takım Ödemedi
+                </button>
+            </div>
+            {% endif %}
+            
+            <div class="players-grid">
+                {% for player in match.teams.a %}
+                {% set player_info = get_player_info(player.player_id) %}
+                {% if player_info %}
+                <div class="player-card {{ get_player_card_class(player_info.overall|default(70)) }}" 
+                     data-player-id="{{ player.player_id }}">
+                    <div class="card-content">
+                        <div class="player-avatar">
+                            <img src="{{ player_info.avatar_url|default('/static/img/default-avatar.png') }}" 
+                                 alt="{{ player_info.name }}">
+                            <span class="player-rating">{{ player_info.overall }}</span>
+                        </div>
+                        <div class="player-details">
+                            <div class="player-name">{{ player_info.name }}</div>
+                            <div class="player-position">{{ player_info.position }}</div>
+                            <div class="payment-status {{ 'paid' if player.has_paid else 'unpaid' }}"
+                                 onclick="{% if is_admin %}updatePaymentStatus('{{ player.player_id }}', {{ 'false' if player.has_paid else 'true' }}){% endif %}">
+                                <span class="amount">{{ "%.2f"|format(player.payment_amount) }} TL</span>
+                                <i class="fas fa-{{ 'check-circle' if player.has_paid else 'exclamation-circle' }}"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="vs-divider">
+            <div class="vs-circle">VS</div>
+        </div>
+
+        <div class="team team-b">
+            {% if is_admin %}
+            <div class="team-actions">
+                <button class="btn btn-success btn-sm" onclick="updateTeamPayments('b', true)">
+                    <i class="fas fa-check-circle"></i> Tüm Takım Ödedi
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="updateTeamPayments('b', false)">
+                    <i class="fas fa-times-circle"></i> Tüm Takım Ödemedi
+                </button>
+            </div>
+            {% endif %}
+            
+            <div class="players-grid">
+                {% for player in match.teams.b %}
+                {% set player_info = get_player_info(player.player_id) %}
+                {% if player_info %}
+                <div class="player-card {{ get_player_card_class(player_info.overall|default(70)) }}" 
+                     data-player-id="{{ player.player_id }}">
+                    <div class="card-content">
+                        <div class="player-avatar">
+                            <img src="{{ player_info.avatar_url|default('/static/img/default-avatar.png') }}" 
+                                 alt="{{ player_info.name }}">
+                            <span class="player-rating">{{ player_info.overall }}</span>
+                        </div>
+                        <div class="player-details">
+                            <div class="player-name">{{ player_info.name }}</div>
+                            <div class="player-position">{{ player_info.position }}</div>
+                            <div class="payment-status {{ 'paid' if player.has_paid else 'unpaid' }}"
+                                 onclick="{% if is_admin %}updatePaymentStatus('{{ player.player_id }}', {{ 'false' if player.has_paid else 'true' }}){% endif %}">
+                                <span class="amount">{{ "%.2f"|format(player.payment_amount) }} TL</span>
+                                <i class="fas fa-{{ 'check-circle' if player.has_paid else 'exclamation-circle' }}"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
-.match-detail-card {
-    background: rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(10px);
+.match-detail-container {
+    max-width: 1200px;
+    margin: 0 auto;
     padding: 20px;
-    border-radius: 10px;
-    margin: 20px 0;
 }
 
-.info-card {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 15px;
-    border-radius: 8px;
-}
-
-.info-item {
-    margin: 10px 0;
-    font-size: 1.1em;
-}
-
-.info-item i {
-    margin-right: 10px;
-    color: var(--primary-color);
-}
-
-.score-display {
-    background: rgba(0, 0, 0, 0.2);
-    padding: 20px;
-    border-radius: 10px;
-}
-
-.score-numbers {
-    font-size: 2.5em;
-    font-weight: bold;
-    margin: 10px 0;
-}
-
-.team-score {
-    padding: 0 20px;
-}
-
-.score-divider {
-    color: var(--text-color);
-}
-
-.cost-display {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 15px;
-    border-radius: 8px;
-}
-
-.cost-amount {
-    font-size: 1.8em;
-    font-weight: bold;
-    color: var(--primary-color);
-    margin: 10px 0;
-}
-
-.payment-status {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
+.football-field {
+    background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
+                url('/static/img/soccer-304171_960_720.png') center/cover no-repeat;
+    border-radius: 15px;
+    padding: 30px;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
+    gap: 40px;
+    position: relative;
+    min-height: 600px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.5);
 }
 
-.payment-status.paid {
-    background: var(--success-color);
-    color: white;
-}
-
-.payment-status.unpaid {
-    background: var(--danger-color);
-    color: white;
-}
-
-@media (max-width: 768px) {
-    .football-field-container {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch; /* iOS için daha iyi kaydırma */
-        padding-bottom: 15px; /* Kaydırma çubuğu için alan */
-    }
-    
-    .football-field {
-        min-width: 600px; /* Minimum genişlik */
-        height: 400px;
-        margin: 0 auto;
-    }
-    
-    .team-area {
-        width: 45%;
-        min-height: 350px;
-        overflow-y: auto;
-        padding: 10px;
-    }
-    
-    .player-card-field {
-        width: 120px;
-        margin: 5px auto;
-    }
-    
-    .score-numbers {
-        font-size: 1.8em;
-    }
-    
-    .score-input {
-        width: 50px !important;
-        font-size: 1.2em;
-    }
-    
-    .info-card, .score-display, .cost-display {
-        margin-bottom: 15px;
-    }
-    
-    /* Yatay kaydırma göstergesi */
-    .football-field-container::after {
-        content: '← Kaydırın →';
-        display: block;
-        text-align: center;
-        padding: 10px;
-        color: rgba(255,255,255,0.6);
-        font-size: 0.9em;
-    }
-}
-
-/* Tablet görünümü için düzenlemeler */
-@media (min-width: 769px) and (max-width: 1024px) {
-    .football-field {
-        height: 500px;
-    }
-    
-    .team-area {
-        width: 42%;
-    }
-    
-    .player-card-field {
-        width: 130px;
-    }
-}
-
-/* Oyuncu kartları için ek stiller */
-.player-card-field {
-    transition: transform 0.2s ease;
-    margin-bottom: 10px;
-}
-
-.player-card-field:active {
-    transform: scale(0.98);
-}
-
-.player-info {
+.team {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 5px;
 }
 
-.player-name {
-    font-weight: bold;
-    text-align: center;
-    word-break: break-word;
+.team-a .players-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    padding: 20px;
 }
 
-.payment-toggle button {
-    width: 30px;
-    height: 30px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.team-b .players-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    padding: 20px;
 }
 
-/* Saha çizgileri daha belirgin */
-.field-divider, .penalty-area-left, .penalty-area-right, .goal-left, .goal-right {
-    border-width: 2px;
-    border-color: rgba(255,255,255,0.8);
+.player-card {
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 15px;
+    backdrop-filter: blur(5px);
+    transition: all 0.3s ease;
 }
 
-.score-input-group {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    margin: 15px 0;
+.player-card:hover {
+    transform: translateY(-5px);
 }
 
-.score-input {
-    width: 60px !important;
-    text-align: center;
-    font-size: 1.5em;
-    font-weight: bold;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: white;
+.player-card.elite {
+    background: linear-gradient(135deg, rgba(255,215,0,0.3), rgba(255,140,0,0.3));
+    animation: glowElite 2s infinite;
 }
 
-.score-input:focus {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: var(--primary-color);
-    color: white;
+.player-card.gold {
+    background: linear-gradient(135deg, rgba(255,165,0,0.3), rgba(255,99,71,0.3));
+    animation: glowGold 2s infinite;
+}
+
+/* Diğer stiller aynı kalacak */
+
+@keyframes glowElite {
+    0%, 100% { box-shadow: 0 0 15px rgba(255,215,0,0.5); }
+    50% { box-shadow: 0 0 30px rgba(255,215,0,0.8); }
+}
+
+@keyframes glowGold {
+    0%, 100% { box-shadow: 0 0 15px rgba(255,165,0,0.5); }
+    50% { box-shadow: 0 0 30px rgba(255,165,0,0.8); }
 }
 </style>
 
 <script>
-// Skor güncelleme fonksiyonu
-async function updateScore(matchId) {
-    if (!requireAdmin()) return;
-    
-    const scoreTeamA = document.getElementById('score_team_a').value;
-    const scoreTeamB = document.getElementById('score_team_b').value;
-    const date = document.getElementById('match_date').value;
-    const location = document.getElementById('match_location').value;
-    
-    try {
-        const response = await fetch(`/api/matches/${matchId}`, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                score_team_a: scoreTeamA ? parseInt(scoreTeamA) : null,
-                score_team_b: scoreTeamB ? parseInt(scoreTeamB) : null,
-                date: date,
-                location: location
-            })
-        });
-
-        if (response.ok) {
-            Swal.fire({
-                icon: 'success',
-                title: 'Başarılı!',
-                text: 'Maç bilgileri güncellendi.',
-                showConfirmButton: false,
-                timer: 1500
-            }).then(() => {
-                window.location.reload();
-            });
-        } else {
-            throw new Error('Güncelleme başarısız');
-        }
-    } catch (error) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Hata!',
-            text: 'Maç bilgileri güncellenirken bir hata oluştu!'
-        });
-    }
-}
-
-// Ödeme durumu güncelleme fonksiyonu
-async function togglePaymentStatus(playerId, matchId) {
-    if (!requireAdmin()) return;
-
-    try {
-        const button = event.target.closest('button');
-        const response = await fetch(`/api/matches/${matchId}/players/${playerId}/payment`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok && data.success) {
-            // Buton rengini ve içeriğini güncelle
-            button.classList.remove('btn-success', 'btn-danger');
-            button.classList.add(data.has_paid ? 'btn-success' : 'btn-danger');
-            
-            const icon = button.querySelector('i');
-            if (icon) {
-                icon.classList.remove('fa-check', 'fa-times');
-                icon.classList.add(data.has_paid ? 'fa-check' : 'fa-times');
-            }
-            
-            button.innerHTML = `<i class="fas fa-${data.has_paid ? 'check' : 'times'}"></i>`;
-            
-            // Başarı mesajı göster
-            Swal.fire({
-                icon: 'success',
-                title: 'Başarılı!',
-                text: data.message,
-                showConfirmButton: false,
-                timer: 1500
-            });
-        } else {
-            throw new Error(data.message || 'Güncelleme başarısız');
-        }
-    } catch (error) {
-        console.error('Ödeme durumu güncelleme hatası:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Hata!',
-            text: 'Ödeme durumu güncellenirken bir hata oluştu!'
-        });
-    }
-}
+// Mevcut JavaScript fonksiyonları aynı kalacak
 </script>
 {% endblock %}

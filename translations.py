@@ -87,7 +87,7 @@ translations = {
         'per_person_cost': 'Kişi Başı: {amount} TL',
         'total_amount': 'Toplam: {amount} TL',
         'all_payments_completed': 'Tüm ödemeler tamamlandı',
-        'mark_all_paid': 'Tüm Ödemeleri Tamamla',
+        'mark_all_paid': 'Tümünü Ödenmiş İşaretle',
 
         # İstatistikler
         'total_matches': 'Toplam Maç',
@@ -171,6 +171,41 @@ translations = {
         'likes_dislikes': 'Sevenler / Sevmeyenler',
         'total_reactions': 'toplam reaksiyon',
         'login_required_for_reaction': 'Beğeni/beğenmeme için giriş yapmalısınız',
-        'reaction_error': 'Reaksiyon işlemi sırasında hata oluştu'
+        'reaction_error': 'Reaksiyon işlemi sırasında hata oluştu',
+
+        # Admin Çıkışı
+        'admin_logout': 'Yönetici Çıkış',
+        'admin_already_logged_in': 'Yönetici olarak giriş yapmışken oyuncu girişi yapamazsınız',
+        'player_already_logged_in': 'Oyuncu olarak giriş yapmışken yönetici girişi yapamazsınız',
+        'player_logout': 'Oyuncu Çıkış',
+        'login_success': 'Giriş başarılı',
+        'logout_success': 'Çıkış başarılı',
+
+        # API
+        'invalid_api_key': 'Geçersiz API anahtarı',
+        'admin_already_logged_in': 'Yönetici olarak giriş yapmışken oyuncu girişi yapamazsınız',
+        'player_already_logged_in': 'Oyuncu olarak giriş yapmışken yönetici girişi yapamazsınız',
+        'admin_logout': 'Yönetici Çıkış',
+        'player_logout': 'Oyuncu Çıkış',
+        'login_required': 'Giriş Gerekli',
+        'session_expired': 'Oturum süresi doldu',
+        'invalid_session': 'Geçersiz oturum',
+        'login_success': 'Giriş başarılı',
+        'logout_success': 'Çıkış başarılı',
+
+        # Yeni çeviriler
+        'team_a': 'A Takımı',
+        'team_b': 'B Takımı',
+        'paid': 'Ödendi',
+        'not_paid': 'Ödenmedi',
+        'mark_all_paid': 'Tümünü Ödenmiş İşaretle',
+        'delete_match': 'Maçı Sil',
+        'confirm_delete': 'Silmeyi Onayla',
+        'delete_match_confirm': 'Bu maçı silmek istediğinizden emin misiniz?',
+        'payment_update_error': 'Ödeme durumu güncellenirken bir hata oluştu',
+        'delete_error': 'Maç silinirken bir hata oluştu',
+        'match_not_found': 'Maç bulunamadı',
+        'total_cost': 'Toplam Tutar',
+        'per_person_cost': 'Kişi Başı: {amount} TL'
     }
 } 

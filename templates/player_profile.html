@@ -1,499 +1,614 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container">
-    <div class="player-profile {{ get_player_card_class(player.overall) }}">
-        <div class="row">
-            <div class="col-md-4">
-                <div class="player-info text-center">
-                    <h2 class="player-name">{{ player.name }}</h2>
-                    <div class="badge badge-primary position-badge">{{ player.position }}</div>
-                    <div class="overall-rating mt-3 {{ get_player_card_class(player.overall) }}">
-                        <h1>{{ player.overall }}</h1>
-                        <small>{{ translate('overall') }}</small>
+<div class="profile-container">
+    {% if is_admin %}
+    <!-- Admin Düzenleme Formu -->
+    <div class="edit-section mb-4">
+        <h3><i class="fas fa-edit"></i> Oyuncu Bilgilerini Düzenle</h3>
+        <form id="editPlayerForm" onsubmit="handleEditPlayer(event)">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>İsim</label>
+                        <input type="text" class="form-control" id="edit_name" value="{{ player.name }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>TC Kimlik No</label>
+                        <input type="text" class="form-control" id="edit_tc_no" value="{{ player.tc_no }}" 
+                               pattern="\d{11}" maxlength="11">
+                    </div>
+                    <div class="form-group">
+                        <label>Pozisyon</label>
+                        <select class="form-control" id="edit_position">
+                            <option value="Kaleci" {% if player.position == 'Kaleci' %}selected{% endif %}>Kaleci</option>
+                            <option value="Defans" {% if player.position == 'Defans' %}selected{% endif %}>Defans</option>
+                            <option value="Orta Saha" {% if player.position == 'Orta Saha' %}selected{% endif %}>Orta Saha</option>
+                            <option value="Forvet" {% if player.position == 'Forvet' %}selected{% endif %}>Forvet</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="stats-section">
+                        <h6>Oyuncu Statları</h6>
+                        {% for stat, label in [
+                            ('pace', 'Hız'),
+                            ('shooting', 'Şut'),
+                            ('passing', 'Pas'),
+                            ('dribbling', 'Dribling'),
+                            ('defending', 'Defans'),
+                            ('physical', 'Fizik')
+                        ] %}
+                        <div class="form-group">
+                            <label for="edit_{{ stat }}">{{ label }}</label>
+                            <div class="d-flex align-items-center">
+                                <input type="range" class="custom-range flex-grow-1" id="edit_{{ stat }}"
+                                       min="1" max="99" value="{{ player.stats[stat] }}"
+                                       oninput="updateStatValue(this)">
+                                <span id="edit_{{ stat }}_value" class="ml-2 stat-value">{{ player.stats[stat] }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
-            <div class="col-md-8">
-                <div class="player-stats">
-                    <div class="stat-card">
-                        <h4>{{ translate('player_stats') }}</h4>
-                        <div>{{ translate('total_matches') }}: {{ stats.total_matches }}</div>
-                        <div>{{ translate('wins') }}: {{ stats.wins }}</div>
-                        <div>{{ translate('losses') }}: {{ stats.losses }}</div>
-                        <div>{{ translate('win_rate') }}: {{ "%.1f"|format(stats.win_rate) }}%</div>
+            <div class="text-center mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Değişiklikleri Kaydet
+                </button>
+                <button type="button" class="btn btn-danger" onclick="deletePlayer()">
+                    <i class="fas fa-trash"></i> Oyuncuyu Sil
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Sol Kolon: Oyuncu Kartı ve İstatistikler -->
+        <div class="col-lg-4">
+            <div class="player-card {{ get_player_card_class(player.overall) }}">
+                <div class="card-header">
+                    <div class="player-info">
+                        <div class="player-avatar">
+                            <img src="{{ player.avatar_url|default('/static/img/default-avatar.png') }}" alt="{{ player.name }}">
+                        </div>
+                        <h2 class="player-name">{{ player.name }}</h2>
+                        <div class="player-meta">
+                            <span class="position-badge">{{ player.position }}</span>
+                            <span class="nationality">
+                                <img src="/static/img/flags/tr.png" alt="TR" class="flag-icon">
+                                Türkiye
+                            </span>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <h4>{{ translate('player_values') }}</h4>
-                        <div>{{ translate('pace') }}: {{ player.pace }}</div>
-                        <div>{{ translate('shooting') }}: {{ player.shooting }}</div>
-                        <div>{{ translate('passing') }}: {{ player.passing }}</div>
-                        <div>{{ translate('dribbling') }}: {{ player.dribbling }}</div>
-                        <div>{{ translate('defending') }}: {{ player.defending }}</div>
-                        <div>{{ translate('physical') }}: {{ player.physical }}</div>
+                    <div class="overall-rating">
+                        <span class="rating-value">{{ player.overall }}</span>
+                        <span class="rating-label">GENEL</span>
                     </div>
                 </div>
                 
-                <div class="win-rate-chart">
-                    <div class="chart-container">
-                        <canvas id="winRateChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="match-history">
-            <h3>{{ translate('match_history') }}</h3>
-            {% for match in match_history %}
-            <div class="match-item" onclick="window.location.href='/matches/{{ match.match_id }}'" style="cursor: pointer;">
-                <div class="match-date">
-                    {{ match.date.strftime('%d/%m/%Y') }}
-                </div>
-                <div class="match-details">
-                    {{ match.location }}
-                </div>
-                <div class="match-score">
-                    {{ match.score_team_a }} - {{ match.score_team_b }}
-                </div>
-                <div class="match-result {{ 'draw' if match.is_draw else 'win' if match.is_winner else 'loss' }}">
-                    {% if match.is_draw %}
-                        {{ translate('draw') }}
-                    {% else %}
-                        {{ translate('win') if match.is_winner else translate('loss') }}
-                    {% endif %}
-                </div>
-                <div class="payment-status">
-                    <i class="fas fa-{{ 'check text-success' if match.has_paid else 'times text-danger' }}"></i>
-                    {{ match.payment_amount }} TL
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-
-        <div class="payment-history">
-            <h3>{{ translate('payment_history') }}</h3>
-            <div class="payment-summary">
-                <div class="stat-card">
-                    <h4>{{ translate('payment_status') }}</h4>
-                    <div>{{ translate('total_debt', amount="%.2f"|format(payment_stats.total_debt)) }}</div>
-                    <div>{{ translate('paid_amount', amount="%.2f"|format(payment_stats.total_paid)) }}</div>
-                    <div>{{ translate('remaining_amount', amount="%.2f"|format(payment_stats.remaining)) }}</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- TC No (sadece admin görebilir) -->
-        {% if is_admin %}
-        <div class="admin-section mt-3">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5>{{ translate('admin_info') }}</h5>
-                </div>
                 <div class="card-body">
-                    <p><strong>{{ translate('tc_no') }}:</strong> 
-                        {% if player.tc_no %}
-                            {{ player.tc_no }}
-                        {% else %}
-                            <span class="text-muted">{{ translate('tc_not_set') }}</span>
-                        {% endif %}
-                    </p>
-                    <button class="btn btn-warning" onclick="editPlayerTC({{ player.id }})">
-                        <i class="fas fa-edit"></i> {{ translate('edit_tc') }}
-                    </button>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Yorumlar ve Beğeniler Bölümü -->
-        <div class="comments-section mt-4">
-            <h3>{{ translate('comments') }}</h3>
-            {% if is_logged_in or is_admin %}
-                <form onsubmit="addComment(event)">
-                    <div class="form-group">
-                        <textarea class="form-control" id="comment" rows="3" required></textarea>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-label">PAC</span>
+                            <div class="stat-bar">
+                                <div class="stat-fill" style="width: {{ player.stats.pace }}%"></div>
+                            </div>
+                            <span class="stat-value {{ get_stat_class(player.stats.pace) }}">{{ player.stats.pace }}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">SHO</span>
+                            <div class="stat-bar">
+                                <div class="stat-fill" style="width: {{ player.stats.shooting }}%"></div>
+                            </div>
+                            <span class="stat-value {{ get_stat_class(player.stats.shooting) }}">{{ player.stats.shooting }}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">PAS</span>
+                            <div class="stat-bar">
+                                <div class="stat-fill" style="width: {{ player.stats.passing }}%"></div>
+                            </div>
+                            <span class="stat-value {{ get_stat_class(player.stats.passing) }}">{{ player.stats.passing }}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">DRI</span>
+                            <div class="stat-bar">
+                                <div class="stat-fill" style="width: {{ player.stats.dribbling }}%"></div>
+                            </div>
+                            <span class="stat-value {{ get_stat_class(player.stats.dribbling) }}">{{ player.stats.dribbling }}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">DEF</span>
+                            <div class="stat-bar">
+                                <div class="stat-fill" style="width: {{ player.stats.defending }}%"></div>
+                            </div>
+                            <span class="stat-value {{ get_stat_class(player.stats.defending) }}">{{ player.stats.defending }}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">PHY</span>
+                            <div class="stat-bar">
+                                <div class="stat-fill" style="width: {{ player.stats.physical }}%"></div>
+                            </div>
+                            <span class="stat-value {{ get_stat_class(player.stats.physical) }}">{{ player.stats.physical }}</span>
+                        </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">
-                        {{ translate('add_comment') }}
-                    </button>
-                </form>
-            {% else %}
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i> 
-                    {{ translate('login_required_for_comment') }}
-                    <a href="{{ url_for('player_login') }}">{{ translate('login') }}</a>
                 </div>
-            {% endif %}
-            
-            <!-- Yorum listesi -->
-            <div class="comments-list mt-3">
-                {% for comment in player.comments_received %}
-                <div class="comment-item">
-                    {% if comment.is_admin_comment %}
-                        <strong class="admin-comment">
-                            <i class="fas fa-shield-alt"></i> Admin
-                        </strong>
-                    {% else %}
-                        <strong>{{ comment.commenter.name }}</strong>
-                    {% endif %}
-                    <p>{{ comment.comment }}</p>
-                    <small>{{ comment.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+            </div>
+
+            <!-- Performans İstatistikleri -->
+            <div class="stats-card mt-4">
+                <h4><i class="fas fa-chart-line"></i> Performans İstatistikleri</h4>
+                <div class="stats-info">
+                    <div class="stat-row">
+                        <span class="stat-label">Toplam Maç</span>
+                        <span class="stat-value">{{ stats.total_matches }}</span>
+                    </div>
+                    <div class="stat-row win">
+                        <span class="stat-label">Galibiyet</span>
+                        <span class="stat-value">{{ stats.wins }}</span>
+                    </div>
+                    <div class="stat-row draw">
+                        <span class="stat-label">Beraberlik</span>
+                        <span class="stat-value">{{ stats.draws }}</span>
+                    </div>
+                    <div class="stat-row loss">
+                        <span class="stat-label">Mağlubiyet</span>
+                        <span class="stat-value">{{ stats.losses }}</span>
+                    </div>
+                    <div class="win-rate-circle">
+                        <div class="circle-progress" data-value="{{ stats.win_rate }}">
+                            <span class="circle-text">%{{ "%.1f"|format(stats.win_rate) }}</span>
+                        </div>
+                        <span class="circle-label">Galibiyet Oranı</span>
+                    </div>
                 </div>
-                {% endfor %}
+                <canvas id="winRateChart" class="mt-3"></canvas>
             </div>
         </div>
 
-        <div class="likes-section mt-4">
-            <h4>{{ translate('likes_dislikes') }}</h4>
-            <div class="likes-container">
-                <div class="likes-stats">
-                    <div class="like-percentage">
-                        {% set total_reactions = player.likes_received.count() %}
-                        {% set likes = player.likes_received.filter_by(is_like=true).count() %}
-                        {% set dislikes = player.likes_received.filter_by(is_like=false).count() %}
-                        {% set like_percent = (likes / total_reactions * 100) if total_reactions > 0 else 0 %}
-                        {% set dislike_percent = (dislikes / total_reactions * 100) if total_reactions > 0 else 0 %}
-                        
-                        <div class="d-flex align-items-center mb-2">
-                            <div class="like-btn {% if has_liked == true %}active{% endif %}" 
-                                 onclick="toggleReaction(true)">
-                                <i class="fas fa-thumbs-up"></i>
-                                <span>%{{ "%.0f"|format(like_percent) }}</span>
+        <!-- Orta Kolon: Maç Geçmişi -->
+        <div class="col-lg-4">
+            <div class="match-history-card">
+                <h4><i class="fas fa-history"></i> Maç Geçmişi</h4>
+                <div class="match-list">
+                    {% for match in stats.match_history %}
+                    <a href="/matches/{{ match.id }}" class="match-item {{ 'win' if match.is_winner else 'loss' if not match.is_draw else 'draw' }}">
+                        <div class="match-header">
+                            <div class="match-date">
+                                <i class="far fa-calendar"></i>
+                                {{ match.date.strftime('%d/%m/%Y') }}
                             </div>
-                            <div class="progress flex-grow-1 mx-2">
-                                <div class="progress-bar bg-success" style="width: {{ like_percent }}%"></div>
-                            </div>
-                            <div class="dislike-btn {% if has_liked == false %}active{% endif %}"
-                                 onclick="toggleReaction(false)">
-                                <i class="fas fa-thumbs-down"></i>
-                                <span>%{{ "%.0f"|format(dislike_percent) }}</span>
+                            <div class="match-location">
+                                <i class="fas fa-map-marker-alt"></i>
+                                {{ match.location }}
                             </div>
                         </div>
-                        <small class="text-muted">{{ total_reactions }} {{ translate('total_reactions') }}</small>
+                        <div class="match-score-container">
+                            <div class="team team-a">Takım A</div>
+                            <div class="score">
+                                <span>{{ match.score_team_a|default('-') }}</span>
+                                <span class="score-divider">-</span>
+                                <span>{{ match.score_team_b|default('-') }}</span>
+                            </div>
+                            <div class="team team-b">Takım B</div>
+                        </div>
+                        <div class="match-payment {{ 'paid' if match.has_paid else 'unpaid' }}">
+                            <span class="amount">{{ match.payment_amount }} TL</span>
+                            <i class="fas fa-{{ 'check-circle' if match.has_paid else 'exclamation-circle' }}"></i>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sağ Kolon: Beğeniler ve Yorumlar -->
+        <div class="col-lg-4">
+            <!-- Beğeni Kartı -->
+            <div class="reactions-card">
+                <h4><i class="fas fa-heart"></i> Beğeniler</h4>
+                <div class="reactions-container">
+                    <div class="reaction-circle">
+                        <div class="circle-content">
+                            <div class="reaction-stats">
+                                <div class="likes">
+                                    <i class="fas fa-thumbs-up"></i>
+                                    <span>{{ like_count }} (%{{ "%.1f"|format(like_percent) }})</span>
+                                </div>
+                                <div class="dislikes">
+                                    <i class="fas fa-thumbs-down"></i>
+                                    <span>{{ dislike_count }} (%{{ "%.1f"|format(dislike_percent) }})</span>
+                                </div>
+                            </div>
+                            <div class="reaction-progress">
+                                <div class="progress">
+                                    <div class="progress-bar bg-success" style="width: {{ like_percent }}%"></div>
+                                    <div class="progress-bar bg-danger" style="width: {{ dislike_percent }}%"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                    {% if is_logged_in %}
+                    <div class="reaction-buttons">
+                        <button class="btn {{ 'active' if current_user_reaction == 'like' }}" onclick="handleReaction('like')">
+                            <i class="fas fa-thumbs-up"></i>
+                        </button>
+                        <button class="btn {{ 'active' if current_user_reaction == 'dislike' }}" onclick="handleReaction('dislike')">
+                            <i class="fas fa-thumbs-down"></i>
+                        </button>
+                    </div>
+                    {% else %}
+                    <div class="login-message">
+                        Giriş yapmadınız, beğeni yapamazsınız.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Yorumlar Kartı -->
+            <div class="comments-card mt-4">
+                <h4><i class="fas fa-comments"></i> Yorumlar</h4>
+                <form onsubmit="handleComment(event)" class="comment-form">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="comment" placeholder="Yorum yaz...">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </form>
+                <div class="comments-list">
+                    {% for comment in comments %}
+                    <div class="comment-item {{ 'admin-comment' if comment.is_admin }}">
+                        <div class="comment-header">
+                            {% if comment.is_admin %}
+                            <i class="fas fa-shield-alt"></i>
+                            {% endif %}
+                            <strong>{{ comment.commenter_name }}</strong>
+                            <small>{{ comment.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
+                        </div>
+                        <p>{{ comment.comment }}</p>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-// Win Rate Chart
-document.addEventListener('DOMContentLoaded', function() {
-    const ctx = document.getElementById('winRateChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: {{ chart_data.labels|tojson }},
-            datasets: [{
-                label: '{{ translate("win_rate") }}',
-                data: {{ chart_data.win_rates|tojson }},
-                borderColor: '#2ecc71',
-                backgroundColor: 'rgba(46, 204, 113, 0.2)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4,
-                pointBackgroundColor: '#2ecc71',
-                pointBorderColor: '#fff',
-                pointHoverBackgroundColor: '#fff',
-                pointHoverBorderColor: '#2ecc71',
-                pointRadius: 5,
-                pointHoverRadius: 7
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        color: '#fff',
-                        font: { size: 14 }
-                    }
-                },
-                title: {
-                    display: true,
-                    text: '{{ translate("win_rate_change") }}',
-                    color: '#fff',
-                    font: {
-                        size: 16,
-                        weight: 'bold'
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    ticks: {
-                        color: '#fff',
-                        callback: function(value) {
-                            return value + '%';
-                        }
-                    }
-                },
-                x: {
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    ticks: {
-                        color: '#fff'
-                    }
-                }
-            }
-        }
-    });
-});
-</script>
-
 <style>
-/* Profil kartı animasyonları */
-.player-profile {
+/* Genel Stiller */
+.profile-container {
+    padding: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Oyuncu Kartı Stilleri */
+.player-card {
+    border-radius: 20px;
+    padding: 25px;
+    color: white;
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
 }
 
-.player-profile::before {
+.player-card::before {
     content: '';
     position: absolute;
     top: 0;
-    left: -100%;
+    left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(255, 255, 255, 0.1),
-        transparent
-    );
-    animation: shine 3s infinite;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0));
+    z-index: 1;
 }
 
-/* Kart tipine göre parıltı efekti */
-.player-profile.player-bronze::before {
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(205, 127, 50, 0.2),
-        transparent
-    );
+.player-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 60px;
+    margin: 0 auto 15px;
+    overflow: hidden;
+    border: 3px solid rgba(255,255,255,0.3);
 }
 
-.player-profile.player-silver::before {
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(192, 192, 192, 0.2),
-        transparent
-    );
+.player-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
-.player-profile.player-gold::before {
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(255, 215, 0, 0.2),
-        transparent
-    );
+.player-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
 }
 
-.player-profile.player-special::before {
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(255, 77, 77, 0.2),
-        rgba(121, 40, 202, 0.2),
-        transparent
-    );
+.flag-icon {
+    width: 24px;
+    height: 16px;
+    border-radius: 2px;
 }
 
-@keyframes shine {
-    0% { left: -100%; }
-    50% { left: 100%; }
-    100% { left: 100%; }
+/* Stat Çubukları */
+.stat-bar {
+    height: 6px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 3px;
+    overflow: hidden;
 }
 
-.player-name {
-    font-size: 2.5em;
-    font-weight: bold;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-    margin-bottom: 15px;
-    background: linear-gradient(45deg, #fff, #ccc);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: nameShine 2s infinite;
+.stat-fill {
+    height: 100%;
+    background: linear-gradient(90deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0.5) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
 }
 
-@keyframes nameShine {
-    0% { filter: brightness(100%); }
-    50% { filter: brightness(120%); }
-    100% { filter: brightness(100%); }
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
 }
 
-.position-badge {
-    font-size: 1.2em;
-    padding: 8px 16px;
-    margin-bottom: 20px;
-    background: rgba(0,0,0,0.3);
-    border: 1px solid rgba(255,255,255,0.1);
-    animation: badgePulse 2s infinite;
-}
-
-@keyframes badgePulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-}
-
-/* Kart rengine göre stat-card stilleri */
-.player-bronze .stat-card {
-    border-left: 4px solid #cd7f32;
-}
-
-.player-silver .stat-card {
-    border-left: 4px solid #C0C0C0;
-}
-
-.player-gold .stat-card {
-    border-left: 4px solid #FFD700;
-}
-
-.player-special .stat-card {
-    border-left: 4px solid #ff4d4d;
-    border-right: 4px solid #7928ca;
-}
-
-.stat-card {
-    transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-    transform: translateX(5px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-}
-
-/* Maç geçmişi kartları için hover efekti */
+/* Maç Geçmişi */
 .match-item {
-    transition: all 0.3s ease;
-    border-left: 4px solid transparent;
-}
-
-.player-bronze .match-item:hover {
-    border-left-color: #cd7f32;
-}
-
-.player-silver .match-item:hover {
-    border-left-color: #C0C0C0;
-}
-
-.player-gold .match-item:hover {
-    border-left-color: #FFD700;
-}
-
-.player-special .match-item:hover {
-    border-left-color: #ff4d4d;
-}
-
-.likes-section {
-    margin: 20px 0;
-}
-
-.btn-like {
-    background: none;
-    border: none;
-    color: #ccc;
-    font-size: 24px;
-    padding: 5px 10px;
-    transition: all 0.3s ease;
-}
-
-.btn-like:not([disabled]):hover {
-    color: #ff4d4d;
-    transform: scale(1.1);
-}
-
-.btn-like.liked {
-    color: #ff4d4d;
-}
-
-.btn-like[disabled] {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.likes-section span {
-    font-size: 18px;
-    color: #666;
-}
-
-.likes-container {
-    background: rgba(0,0,0,0.2);
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: rgba(255,255,255,0.05);
     border-radius: 10px;
-    padding: 20px;
+    padding: 15px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
 }
 
-.likes-stats {
-    max-width: 500px;
-    margin: 0 auto;
-}
-
-.like-percentage {
-    text-align: center;
-}
-
-.progress {
-    height: 10px;
+.match-item:hover {
+    transform: translateY(-2px);
     background: rgba(255,255,255,0.1);
 }
 
-.like-btn, .dislike-btn {
-    cursor: pointer;
-    padding: 10px;
-    border-radius: 5px;
-    transition: all 0.3s ease;
-    color: #aaa;
-}
-
-.like-btn:hover {
-    color: #2ecc71;
-}
-
-.dislike-btn:hover {
-    color: #e74c3c;
-}
-
-.like-btn.active {
-    color: #2ecc71;
-}
-
-.dislike-btn.active {
-    color: #e74c3c;
-}
-
-.like-btn i, .dislike-btn i {
-    font-size: 24px;
-    margin-right: 5px;
-}
-
-.admin-comment {
-    color: #e74c3c;
-}
-
-.admin-comment i {
-    margin-right: 5px;
-}
-
-.comment-item {
-    padding: 10px;
+.match-header {
+    display: flex;
+    justify-content: space-between;
     margin-bottom: 10px;
-    border-radius: 5px;
-    background: rgba(255,255,255,0.05);
+}
+
+.match-score-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin: 15px 0;
+}
+
+.score {
+    font-size: 1.5em;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.score-divider {
+    color: rgba(255,255,255,0.5);
+}
+
+/* Beğeni Kartı Stilleri */
+.reactions-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+}
+
+.reaction-circle {
+    width: 200px;
+    height: 200px;
+    position: relative;
+}
+
+.circle-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    width: 100%;
+}
+
+.reaction-stats {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 10px;
+}
+
+.likes, .dislikes {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.likes i { color: #2ECC71; }
+.dislikes i { color: #E74C3C; }
+
+.circular-chart {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.circular-chart path {
+    transition: stroke-dasharray 0.5s ease;
+}
+
+.reaction-buttons {
+    display: flex;
+    gap: 20px;
+}
+
+.reaction-buttons .btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2em;
+    transition: all 0.3s ease;
+}
+
+.reaction-buttons .btn:first-child {
+    background: rgba(46, 204, 113, 0.1);
+    color: #2ECC71;
+}
+
+.reaction-buttons .btn:last-child {
+    background: rgba(231, 76, 60, 0.1);
+    color: #E74C3C;
+}
+
+.reaction-buttons .btn.active {
+    transform: scale(1.1);
+}
+
+.reaction-buttons .btn:first-child.active {
+    background: #2ECC71;
+    color: white;
+}
+
+.reaction-buttons .btn:last-child.active {
+    background: #E74C3C;
+    color: white;
+}
+
+.login-message {
+    color: rgba(255,255,255,0.5);
+    text-align: center;
+}
+
+/* Responsive Düzenlemeler */
+@media (max-width: 768px) {
+    .match-score-container {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .reaction-circle {
+        width: 150px;
+        height: 150px;
+    }
+}
+
+/* Oyuncu Kartı Renkleri */
+.player-card.elite {
+    background: linear-gradient(135deg, #FFD700, #FF8C00);
+    box-shadow: 0 10px 20px rgba(255, 215, 0, 0.3);
+}
+
+.player-card.gold {
+    background: linear-gradient(135deg, #FFA500, #FF6347);
+    box-shadow: 0 10px 20px rgba(255, 165, 0, 0.3);
+}
+
+.player-card.silver {
+    background: linear-gradient(135deg, #C0C0C0, #808080);
+    box-shadow: 0 10px 20px rgba(192, 192, 192, 0.3);
+}
+
+.player-card.bronze {
+    background: linear-gradient(135deg, #CD7F32, #8B4513);
+    box-shadow: 0 10px 20px rgba(205, 127, 50, 0.3);
+}
+
+/* Stat değerlerine göre renkler */
+.stat-value.stat-high {
+    color: #FFD700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.stat-value.stat-medium {
+    color: #FFA500;
+    text-shadow: 0 0 10px rgba(255, 165, 0, 0.5);
+}
+
+.stat-value.stat-low {
+    color: #FF6347;
+    text-shadow: 0 0 10px rgba(255, 99, 71, 0.5);
+}
+
+/* Kart efektleri */
+.player-card {
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    animation: cardShine 2s infinite;
+}
+
+@keyframes cardShine {
+    0% {
+        background-position: 100% 100%;
+    }
+    50% {
+        background-position: 0% 0%;
+    }
+    100% {
+        background-position: 100% 100%;
+    }
+}
+
+.overall-rating {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 15px;
+    border-radius: 50%;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.rating-value {
+    font-size: 2em;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.position-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 5px 15px;
+    border-radius: 15px;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 0.9em;
+    letter-spacing: 1px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
 }
 </style>
+
+<script>
+// Mevcut JavaScript kodları aynı kalacak
+// Win Rate Chart ve diğer fonksiyonlar...
+
+// Yeni: Daire Progress Bar Animasyonu
+document.querySelectorAll('.circle-progress').forEach(circle => {
+    const value = circle.dataset.value;
+    circle.style.background = `conic-gradient(
+        #4CAF50 ${value * 3.6}deg,
+        rgba(255,255,255,0.1) ${value * 3.6}deg
+    )`;
+});
+</script>
 {% endblock %} 

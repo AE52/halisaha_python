@@ -15,62 +15,23 @@
         {% for match in matches if match.date >= now %}
         <div class="card match-card mb-3">
             <div class="card-body">
-                <form class="match-form" onsubmit="handleMatchUpdate(event, {{ match.id }})">
-                    <div class="row g-3">
-                        <div class="col-12 col-md-4">
-                            <div class="form-group">
-                                <label><i class="fas fa-calendar"></i> {{ translate('date_label') }}</label>
-                                <input type="datetime-local" class="form-control" name="date" 
-                                       value="{{ match.date.strftime('%Y-%m-%dT%H:%M') }}" required>
-                            </div>
-                            <div class="form-group mt-2">
-                                <label><i class="fas fa-map-marker-alt"></i> {{ translate('location_label') }}</label>
-                                <input type="text" class="form-control" name="location" 
-                                       value="{{ match.location }}" required>
-                            </div>
-                        </div>
-                        <div class="col-12 col-md-4">
-                            <div class="score-section text-center">
-                                <label>{{ translate('score_label') }}</label>
-                                <div class="d-flex justify-content-center align-items-center gap-2">
-                                    <input type="number" class="form-control score-input" name="score_team_a" 
-                                           value="{{ match.score_team_a if match.score_team_a != None }}" min="0">
-                                    <span class="score-divider">-</span>
-                                    <input type="number" class="form-control score-input" name="score_team_b" 
-                                           value="{{ match.score_team_b if match.score_team_b != None }}" min="0">
-                                </div>
-                            </div>
-                            {% if match.is_upcoming %}
-                            <div class="match-timer text-center mt-2" id="timer-{{ match.id }}">
-                                {{ translate('time_remaining', time='...') }}
-                            </div>
-                            {% endif %}
-                        </div>
-                        <div class="col-12 col-md-4">
-                            <div class="form-group">
-                                <label><i class="fas fa-money-bill"></i> {{ translate('cost_label') }}</label>
-                                <input type="number" class="form-control" name="total_cost" 
-                                       value="{{ match.total_cost }}" required>
-                            </div>
-                            <p class="text-center mt-2">
-                                {{ translate('per_person_cost', amount="%.2f"|format(match.total_cost / match.match_players|length if match.match_players else 0)) }}
-                            </p>
-                        </div>
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <h5 class="mb-2"><i class="fas fa-calendar"></i> {{ match.date.strftime('%d/%m/%Y %H:%M') }}</h5>
+                        <p class="mb-2"><i class="fas fa-map-marker-alt"></i> {{ match.location }}</p>
                     </div>
-                    <div class="text-center mt-3">
-                        <button type="submit" class="btn btn-success btn-sm admin-only">
-                            <i class="fas fa-save"></i> {{ translate('save') }}
-                        </button>
-                        <button type="button" class="btn btn-warning btn-sm admin-only" 
-                                onclick="markAllAsPaid({{ match.id }})">
-                            <i class="fas fa-money-bill"></i> Tüm Ödemeleri Tamamla
-                        </button>
-                        <button type="button" class="btn btn-danger btn-sm admin-only" 
-                                onclick="deleteMatch({{ match.id }})">
-                            <i class="fas fa-trash"></i> {{ translate('delete') }}
-                        </button>
+                    <div class="col-12 col-md-4 text-center">
+                        {% if match.score.team_a is not none and match.score.team_b is not none %}
+                            <h4 class="mb-2">{{ match.score.team_a }} - {{ match.score.team_b }}</h4>
+                        {% else %}
+                            <h4 class="mb-2">VS</h4>
+                        {% endif %}
                     </div>
-                </form>
+                    <div class="col-12 col-md-4 text-md-right text-center">
+                        <h5 class="mb-2">{{ match.total_cost }} TL</h5>
+                        <p>Kişi Başı: {{ "%.2f"|format(match.total_cost / (match.teams.a|length + match.teams.b|length)) }} TL</p>
+                    </div>
+                </div>
             </div>
         </div>
         {% endfor %}
@@ -78,8 +39,7 @@
         <!-- Geçmiş Maçlar -->
         <h4 class="mb-3 mt-5">{{ translate('pastmatches') }}</h4>
         {% for match in matches if match.date < now %}
-        <div class="card match-card mb-3" 
-             onclick="playClickSound(); window.location.href='/matches/{{ match.id }}'">
+        <div class="card match-card mb-3" onclick="window.location.href='/matches/{{ match._id }}'">
             <div class="card-body">
                 <div class="row g-3">
                     <div class="col-12 col-md-4">
@@ -87,17 +47,17 @@
                         <p class="mb-2"><i class="fas fa-map-marker-alt"></i> {{ match.location }}</p>
                     </div>
                     <div class="col-12 col-md-4 text-center">
-                        {% if match.score_team_a is not none and match.score_team_b is not none %}
-                            <h4 class="mb-2">{{ match.score_team_a }} - {{ match.score_team_b }}</h4>
-                            <div class="badge badge-info">{{ translate('match_completed') }}</div>
+                        {% if match.score.team_a is not none and match.score.team_b is not none %}
+                            <h4 class="mb-2">{{ match.score.team_a }} - {{ match.score.team_b }}</h4>
+                            <div class="badge badge-info">Maç Tamamlandı</div>
                         {% else %}
-                            <h4 class="mb-2">{{ translate('score_not_set') }}</h4>
-                            <div class="badge badge-warning">{{ translate('result_not_entered') }}</div>
+                            <h4 class="mb-2">VS</h4>
+                            <div class="badge badge-warning">Sonuç Girilmedi</div>
                         {% endif %}
                     </div>
                     <div class="col-12 col-md-4 text-md-right text-center">
                         <h5 class="mb-2">{{ match.total_cost }} TL</h5>
-                        <p>Kişi Başı: {{ "%.2f"|format(match.total_cost / match.match_players|length if match.match_players else 0) }} TL</p>
+                        <p>Kişi Başı: {{ "%.2f"|format(match.total_cost / (match.teams.a|length + match.teams.b|length)) }} TL</p>
                     </div>
                 </div>
             </div>

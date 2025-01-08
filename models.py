@@ -1,119 +1,251 @@
-from datetime import datetime
-from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime, timezone
+from pymongo import MongoClient
+from bson import ObjectId
+from config import Config
 
-db = SQLAlchemy()
+# MongoDB bağlantısı
+client = MongoClient(Config.MONGO_URI)
+db = client[Config.DB_NAME]
 
-# User modelini kaldırıyoruz ve yerine basit bir API_KEY tanımlıyoruz
+# Koleksiyonlar
+players = db.players
+matches = db.matches
+reactions = db.reactions
+
+# Admin API key
 API_KEY = "AE52YAPAR"
 
-class PlayerComment(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    player_id = db.Column(db.Integer, db.ForeignKey('player.id'))
-    commenter_id = db.Column(db.Integer, db.ForeignKey('player.id'))
-    comment = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    likes = db.Column(db.Integer, default=0)
-    is_admin_comment = db.Column(db.Boolean, default=False)
-
-class PlayerLike(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    player_id = db.Column(db.Integer, db.ForeignKey('player.id'))
-    liker_id = db.Column(db.Integer, db.ForeignKey('player.id'))
-    is_like = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    is_admin_reaction = db.Column(db.Boolean, default=False)
-
-class Player(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    tc_no = db.Column(db.String(11), unique=True, nullable=True)
-    position = db.Column(db.String(50))
-    pace = db.Column(db.Integer, default=70)
-    shooting = db.Column(db.Integer, default=70)
-    passing = db.Column(db.Integer, default=70)
-    dribbling = db.Column(db.Integer, default=70)
-    defending = db.Column(db.Integer, default=70)
-    physical = db.Column(db.Integer, default=70)
-    is_active = db.Column(db.Boolean, default=True)
+class Player:
+    @staticmethod
+    def get_by_id(id):
+        player = players.find_one({"_id": str(id)})
+        if player:
+            # Stats değerlerini düzenle
+            stats = player.get('stats', {})
+            player['stats'] = {
+                'pace': stats.get('pace', 70),
+                'shooting': stats.get('shooting', 70),
+                'passing': stats.get('passing', 70),
+                'dribbling': stats.get('dribbling', 70),
+                'defending': stats.get('defending', 70),
+                'physical': stats.get('physical', 70)
+            }
+            
+            # Overall değerini hesapla
+            weights = {
+                'Kaleci': {'pace': 0.1, 'shooting': 0, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.4, 'physical': 0.2},
+                'Defans': {'pace': 0.2, 'shooting': 0.1, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.3, 'physical': 0.1},
+                'Orta Saha': {'pace': 0.15, 'shooting': 0.2, 'passing': 0.25, 'dribbling': 0.2, 'defending': 0.1, 'physical': 0.1},
+                'Forvet': {'pace': 0.2, 'shooting': 0.3, 'passing': 0.15, 'dribbling': 0.2, 'defending': 0.05, 'physical': 0.1}
+            }
+            
+            w = weights.get(player.get('position', 'Orta Saha'))
+            player['overall'] = int(
+                player['stats']['pace'] * w['pace'] +
+                player['stats']['shooting'] * w['shooting'] +
+                player['stats']['passing'] * w['passing'] +
+                player['stats']['dribbling'] * w['dribbling'] +
+                player['stats']['defending'] * w['defending'] +
+                player['stats']['physical'] * w['physical']
+            )
+        return player
     
-    # İlişkiler
-    comments_received = db.relationship('PlayerComment',
-                                      foreign_keys='PlayerComment.player_id',
-                                      backref='player', lazy='dynamic')
-    comments_made = db.relationship('PlayerComment',
-                                  foreign_keys='PlayerComment.commenter_id',
-                                  backref='commenter', lazy='dynamic')
-    likes_received = db.relationship('PlayerLike',
-                                   foreign_keys='PlayerLike.player_id',
-                                   backref='player', lazy='dynamic')
-    likes_given = db.relationship('PlayerLike',
-                                foreign_keys='PlayerLike.liker_id',
-                                backref='liker', lazy='dynamic')
+    @staticmethod
+    def get_all_active():
+        return list(players.find({"is_active": True}))
     
-    @property
-    def overall(self):
-        # Pozisyona göre farklı stat ağırlıkları
-        weights = {
-            'Kaleci': {'pace': 0.1, 'shooting': 0, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.4, 'physical': 0.2},
-            'Defans': {'pace': 0.2, 'shooting': 0.1, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.3, 'physical': 0.1},
-            'Orta Saha': {'pace': 0.15, 'shooting': 0.2, 'passing': 0.25, 'dribbling': 0.2, 'defending': 0.1, 'physical': 0.1},
-            'Forvet': {'pace': 0.2, 'shooting': 0.3, 'passing': 0.15, 'dribbling': 0.2, 'defending': 0.05, 'physical': 0.1}
-        }
+    @staticmethod
+    def get_stats(player_id):
+        """Oyuncunun maç istatistiklerini hesaplar"""
+        matches_played = []
+        total_matches = 0
+        wins = 0
+        draws = 0
         
-        w = weights.get(self.position, weights['Orta Saha'])
-        return int(
-            self.pace * w['pace'] +
-            self.shooting * w['shooting'] +
-            self.passing * w['passing'] +
-            self.dribbling * w['dribbling'] +
-            self.defending * w['defending'] +
-            self.physical * w['physical']
+        # Oyuncunun katıldığı tüm maçları bul
+        all_matches = list(matches.find())
+        for match in all_matches:
+            player_found = False
+            for team in ['a', 'b']:
+                for player in match['teams'][team]:
+                    if player['player_id'] == str(player_id):
+                        player_found = True
+                        total_matches += 1
+                        
+                        # Galibiyet/beraberlik durumunu kontrol et
+                        if match['score'].get('team_a') is not None and match['score'].get('team_b') is not None:
+                            if match['score']['team_a'] == match['score']['team_b']:
+                                draws += 1
+                            elif (team == 'a' and match['score']['team_a'] > match['score']['team_b']) or \
+                                 (team == 'b' and match['score']['team_b'] > match['score']['team_a']):
+                                wins += 1
+                                
+                        # Maç detaylarını ekle
+                        matches_played.append({
+                            'date': match['date'],
+                            'location': match['location'],
+                            'score_team_a': match['score'].get('team_a'),
+                            'score_team_b': match['score'].get('team_b'),
+                            'is_winner': (team == 'a' and match['score'].get('team_a', 0) > match['score'].get('team_b', 0)) or \
+                                       (team == 'b' and match['score'].get('team_b', 0) > match['score'].get('team_a', 0)),
+                            'is_draw': match['score'].get('team_a') == match['score'].get('team_b'),
+                            'has_paid': player.get('has_paid', False),
+                            'payment_amount': player.get('payment_amount', 0)
+                        })
+                        break
+                if player_found:
+                    break
+        
+        return {
+            'total_matches': total_matches,
+            'wins': wins,
+            'draws': draws,
+            'losses': total_matches - wins - draws,
+            'win_rate': (wins / total_matches * 100) if total_matches > 0 else 0,
+            'match_history': sorted(matches_played, key=lambda x: x['date'], reverse=True)
+        }
+
+    @staticmethod
+    def get_reactions(player_id):
+        # Beğeni ve beğenmeme sayılarını getir
+        reaction_stats = reactions.aggregate([
+            {'$match': {'player_id': str(player_id)}},
+            {'$group': {
+                '_id': '$type',
+                'count': {'$sum': 1}
+            }}
+        ])
+        
+        result = {'likes': 0, 'dislikes': 0}
+        for stat in reaction_stats:
+            if stat['_id'] == 'like':
+                result['likes'] = stat['count']
+            elif stat['_id'] == 'dislike':
+                result['dislikes'] = stat['count']
+        
+        return result
+
+    @staticmethod
+    def get_comments(player_id):
+        # Oyuncunun yorumlarını getir
+        return list(reactions.find(
+            {'player_id': str(player_id), 'comment': {'$exists': True}},
+            {'comment': 1, 'created_at': 1, 'commenter_name': 1, 'is_admin': 1}
+        ).sort('created_at', -1))
+
+class Match:
+    @staticmethod
+    def get_by_id(id):
+        return matches.find_one({"_id": str(id)})
+    
+    @staticmethod
+    def get_all():
+        return list(matches.find().sort("date", -1))
+    
+    @staticmethod
+    def create(match_data):
+        match_data["_id"] = str(ObjectId())
+        match_data["created_at"] = datetime.now(timezone.utc)
+        matches.insert_one(match_data)
+        return match_data["_id"]
+
+    @staticmethod
+    def update(id, update_data):
+        matches.update_one(
+            {"_id": str(id)},
+            {"$set": update_data}
         )
 
-class Match(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.DateTime, nullable=False)
-    location = db.Column(db.String(100), nullable=False)
-    total_cost = db.Column(db.Float, nullable=False)
-    score_team_a = db.Column(db.Integer)
-    score_team_b = db.Column(db.Integer)
-    
-    # İlişkileri düzelt
-    match_players = db.relationship(
-        'MatchPlayer',
-        cascade='all, delete-orphan',
-        lazy=True,
-        backref=db.backref('match', lazy=True)
-    )
-    
-    players = db.relationship(
-        'Player',
-        secondary='match_player',
-        backref=db.backref('matches', lazy=True)
-    )
-    
-    @property
-    def is_upcoming(self):
-        return self.date > datetime.now()
-    
-    @property
-    def time_remaining(self):
-        if not self.is_upcoming:
-            return None
-        delta = self.date - datetime.now()
-        days = delta.days
-        hours = delta.seconds // 3600
-        minutes = (delta.seconds % 3600) // 60
-        return {'days': days, 'hours': hours, 'minutes': minutes}
+    @staticmethod
+    def delete(id):
+        matches.delete_one({"_id": str(id)})
 
-class MatchPlayer(db.Model):
-    __tablename__ = 'match_player'
-    id = db.Column(db.Integer, primary_key=True)
-    match_id = db.Column(db.Integer, db.ForeignKey('match.id'))
-    player_id = db.Column(db.Integer, db.ForeignKey('player.id'))
-    team = db.Column(db.String(1))  # 'A' veya 'B'
-    has_paid = db.Column(db.Boolean, default=False)
-    payment_amount = db.Column(db.Float)
-    
-    # İlişkileri kaldır (artık backref kullanıyoruz)
-    player = db.relationship('Player', backref=db.backref('match_players', lazy=True)) 
+    @staticmethod
+    def toggle_payment(match_id, player_id):
+        match = matches.find_one({"_id": str(match_id)})
+        if not match:
+            return False
+        
+        for team in ["a", "b"]:
+            for player in match["teams"][team]:
+                if player["player_id"] == str(player_id):
+                    player["has_paid"] = not player["has_paid"]
+                    matches.update_one(
+                        {"_id": str(match_id)},
+                        {"$set": {"teams": match["teams"]}}
+                    )
+                    return True
+        return False 
+
+    @staticmethod
+    def get_player_stats(player_id):
+        # Oyuncunun tüm maçlarını bul
+        pipeline = [
+            {
+                "$match": {
+                    "$or": [
+                        {"teams.a.player_id": str(player_id)},
+                        {"teams.b.player_id": str(player_id)}
+                    ]
+                }
+            }
+        ]
+        player_matches = list(matches.aggregate(pipeline))
+        
+        total_matches = len(player_matches)
+        wins = 0
+        draws = 0
+        match_history = []
+        
+        for match in player_matches:
+            # Oyuncunun hangi takımda olduğunu bul
+            team = 'a' if any(p['player_id'] == str(player_id) for p in match['teams']['a']) else 'b'
+            other_team = 'b' if team == 'a' else 'a'
+            
+            is_winner = False
+            is_draw = False
+            
+            if match['score'].get('team_a') is not None and match['score'].get('team_b') is not None:
+                if match['score']['team_a'] == match['score']['team_b']:
+                    is_draw = True
+                    draws += 1
+                else:
+                    if team == 'a':
+                        is_winner = match['score']['team_a'] > match['score']['team_b']
+                    else:
+                        is_winner = match['score']['team_b'] > match['score']['team_a']
+                    
+                    if is_winner:
+                        wins += 1
+            
+            # Oyuncunun ödeme durumunu bul
+            player_info = next(p for p in match['teams'][team] if p['player_id'] == str(player_id))
+            
+            match_history.append({
+                'match_id': match['_id'],
+                'date': match['date'],
+                'location': match['location'],
+                'score_team_a': match['score'].get('team_a'),
+                'score_team_b': match['score'].get('team_b'),
+                'is_winner': is_winner,
+                'is_draw': is_draw,
+                'has_paid': player_info['has_paid'],
+                'payment_amount': player_info['payment_amount']
+            })
+        
+        # Ödeme istatistiklerini hesapla
+        payment_stats = {
+            'total_debt': "{:.2f}".format(sum(m['payment_amount'] for m in match_history)),
+            'total_paid': "{:.2f}".format(sum(m['payment_amount'] for m in match_history if m['has_paid'])),
+            'remaining': "{:.2f}".format(sum(m['payment_amount'] for m in match_history if not m['has_paid']))
+        }
+        
+        return {
+            'total_matches': total_matches,
+            'wins': wins,
+            'draws': draws,
+            'losses': total_matches - wins - draws,
+            'win_rate': (wins / total_matches * 100) if total_matches > 0 else 0,
+            'match_history': match_history,
+            'payment_stats': payment_stats
+        } 

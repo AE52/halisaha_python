@@ -4,4 +4,6 @@ PyJWT==2.8.0
 gunicorn==21.2.0
 python-dotenv==1.0.0
 SQLAlchemy==2.0.21
-Werkzeug==2.3.7 
+Werkzeug==2.3.7
+pymongo==4.6.1
+dnspython==2.4.2 

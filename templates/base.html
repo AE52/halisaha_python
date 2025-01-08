@@ -39,8 +39,20 @@
                 </ul>
                 
                 <ul class="navbar-nav ml-auto">
-                    <!-- Oyuncu Girişi/Profil -->
-                    {% if session.get('player_id') %}
+                    {% if request.cookies.get('jwt_token') %}
+                        <!-- Admin girişi yapılmışsa -->
+                        <li class="nav-item">
+                            <span class="nav-link">
+                                <i class="fas fa-user-shield"></i> Admin
+                            </span>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('admin_logout') }}">
+                                <i class="fas fa-sign-out-alt"></i> {{ translate('admin_logout') }}
+                            </a>
+                        </li>
+                    {% elif session.get('player_id') %}
+                        <!-- Oyuncu girişi yapılmışsa -->
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="playerDropdown" role="button" 
                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -57,19 +69,18 @@
                             </div>
                         </li>
                     {% else %}
+                        <!-- Hiç giriş yapılmamışsa -->
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('player_login') }}">
                                 <i class="fas fa-sign-in-alt"></i> {{ translate('player_login') }}
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link admin-login-btn" href="#" onclick="showLoginModal()">
+                                <i class="fas fa-lock"></i> {{ translate('admin_login') }}
+                            </a>
+                        </li>
                     {% endif %}
-
-                    <!-- Admin Girişi -->
-                    <li class="nav-item">
-                        <a class="nav-link admin-login-btn" href="#" onclick="showLoginModal()">
-                            <i class="fas fa-lock"></i> {{ translate('admin_login') }}
-                        </a>
-                    </li>
                 </ul>
             </div>
         </div>
@@ -116,6 +127,31 @@
             </div>
         </div>
     </footer>
+
+    <!-- Admin Login Modal -->
+    <div class="modal fade" id="adminLoginModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ translate('admin_login') }}</h5>
+                    <button type="button" class="close" data-dismiss="modal">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger" id="loginError" style="display: none;"></div>
+                    <div class="form-group">
+                        <label>API Key</label>
+                        <input type="password" class="form-control" id="apiKey">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ translate('cancel') }}</button>
+                    <button type="button" class="btn btn-primary" onclick="handleAdminLogin()">{{ translate('login') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         // Çeviri fonksiyonu
@@ -170,6 +206,40 @@
             setInterval(updateDateTime, 1000);
             updateDateTime();
         }
+    </script>
+
+    <script>
+    function showLoginModal() {
+        $('#adminLoginModal').modal('show');
+    }
+
+    async function handleAdminLogin() {
+        const apiKey = document.getElementById('apiKey').value;
+        
+        try {
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ api_key: apiKey })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                localStorage.setItem('jwt_token', data.access_token);
+                window.location.reload();
+            } else {
+                document.getElementById('loginError').textContent = data.message;
+                document.getElementById('loginError').style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            document.getElementById('loginError').textContent = '{{ translate("login_error") }}';
+            document.getElementById('loginError').style.display = 'block';
+        }
+    }
     </script>
 </body>
 </html> 

@@ -1378,3 +1378,15 @@ async function toggleReaction(isLike) {
         });
     }
 } 
+
+function handleAdminLogout() {
+    // Admin token'ı sil
+    localStorage.removeItem('jwt_token');
+    document.cookie = 'jwt_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    
+    // Admin durumunu güncelle
+    isAdmin = false;
+    
+    // Sayfayı ana sayfaya yönlendir
+    window.location.href = '/';
+} 

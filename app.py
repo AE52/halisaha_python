@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory, make_response
-from models import db, Player, Match, MatchPlayer, API_KEY, PlayerComment, PlayerLike
+from models import Player, Match, API_KEY  # MatchPlayer ve diğer modelleri kaldır
 from config import Config
 from functools import wraps
 from translations import translations
@@ -8,7 +8,6 @@ import jwt
 
 app = Flask(__name__)
 app.config.from_object(Config)
-db.init_app(app)
 
 # Decorator'ları en başa alalım
 def admin_required(f):
@@ -87,9 +86,73 @@ def get_translation(key, **kwargs):
             return text
     return text
 
+def get_player_card_class(overall):
+    if overall >= 85:
+        return 'elite'
+    elif overall >= 75:
+        return 'gold'
+    elif overall >= 65:
+        return 'silver'
+    else:
+        return 'bronze'
+
 @app.context_processor
 def utility_processor():
-    return dict(translate=get_translation)
+    def get_player_info(player_id):
+        player = Player.get_by_id(player_id)
+        if player:
+            # Overall değerini hesapla
+            stats = player.get('stats', {})
+            weights = {
+                'Kaleci': {'pace': 0.1, 'shooting': 0, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.4, 'physical': 0.2},
+                'Defans': {'pace': 0.2, 'shooting': 0.1, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.3, 'physical': 0.1},
+                'Orta Saha': {'pace': 0.15, 'shooting': 0.2, 'passing': 0.25, 'dribbling': 0.2, 'defending': 0.1, 'physical': 0.1},
+                'Forvet': {'pace': 0.2, 'shooting': 0.3, 'passing': 0.15, 'dribbling': 0.2, 'defending': 0.05, 'physical': 0.1}
+            }
+            
+            w = weights.get(player.get('position', 'Orta Saha'))
+            player['overall'] = int(
+                stats.get('pace', 70) * w['pace'] +
+                stats.get('shooting', 70) * w['shooting'] +
+                stats.get('passing', 70) * w['passing'] +
+                stats.get('dribbling', 70) * w['dribbling'] +
+                stats.get('defending', 70) * w['defending'] +
+                stats.get('physical', 70) * w['physical']
+            )
+        return player
+
+    return dict(
+        translate=get_translation,
+        get_player_card_class=get_player_card_class,
+        get_stat_class=get_stat_class,
+        get_player_info=get_player_info
+    )
+
+def get_stat_class(value):
+    try:
+        value = int(value)
+        if value >= 85:
+            return 'stat-high'
+        elif value >= 70:
+            return 'stat-medium'
+        else:
+            return 'stat-low'
+    except (TypeError, ValueError):
+        return 'stat-low'  # Varsayılan değer
+
+def get_player_card_class(overall):
+    try:
+        overall = int(overall)
+        if overall >= 85:
+            return 'elite'
+        elif overall >= 75:
+            return 'gold'
+        elif overall >= 65:
+            return 'silver'
+        else:
+            return 'bronze'
+    except (TypeError, ValueError):
+        return 'bronze'  # Varsayılan değer
 
 @app.route('/')
 def index():
@@ -97,23 +160,26 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # Oyuncu girişi yapılmışsa admin girişine izin verme
+    if 'player_id' in session:
+        flash(get_translation('player_already_logged_in'), 'warning')
+        return redirect(url_for('index'))
+
     if request.method == 'POST':
         data = request.get_json()
         api_key = data.get('api_key')
         
         if api_key == app.config['ADMIN_API_KEY']:
-            # Token oluştur
             token = jwt.encode({
                 'admin': True,
                 'exp': datetime.utcnow() + timedelta(hours=24)
             }, app.config['SECRET_KEY'])
             
             response = jsonify({'access_token': token})
-            # Token'ı cookie olarak da kaydet
             response.set_cookie('jwt_token', token, httponly=True, secure=True)
             return response
         
-        return jsonify({'message': 'Geçersiz API anahtarı!'}), 401
+        return jsonify({'message': get_translation('invalid_api_key')}), 401
     
     return render_template('login.html')
 
@@ -124,30 +190,34 @@ def add_player_api():
     try:
         # TC No kontrolü
         if 'tc_no' in data:
-            existing_player = Player.query.filter_by(tc_no=data['tc_no']).first()
+            existing_player = Player.get_by_tc(data['tc_no'])
             if existing_player:
                 return jsonify({
                     "success": False,
                     "message": get_translation('tc_exists')
                 }), 400
 
-        player = Player(
-            name=data['name'],
-            tc_no=data.get('tc_no'),  # Opsiyonel TC No
-            position=data['position'],
-            overall=data['overall'],
-            pace=data['pace'],
-            shooting=data['shooting'],
-            passing=data['passing'],
-            dribbling=data['dribbling'],
-            defending=data['defending'],
-            physical=data['physical']
-        )
-        db.session.add(player)
-        db.session.commit()
+        # MongoDB'ye uygun formatta oyuncu verisi oluştur
+        player_data = {
+            "name": data['name'],
+            "tc_no": data.get('tc_no'),
+            "position": data['position'],
+            "stats": {
+                "pace": data['pace'],
+                "shooting": data['shooting'],
+                "passing": data['passing'],
+                "dribbling": data['dribbling'],
+                "defending": data['defending'],
+                "physical": data['physical']
+            },
+            "is_active": True,
+            "created_at": datetime.utcnow()
+        }
+        
+        # Oyuncuyu ekle
+        players.insert_one(player_data)
         return jsonify({"success": True, "message": get_translation('player_added')})
     except Exception as e:
-        db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 400
 
 @app.route('/api/players/<int:id>', methods=['PUT'])
@@ -192,13 +262,49 @@ def delete_player_api(id):
 
 @app.route('/players')
 def players():
-    players = Player.query.filter_by(is_active=True).all()
-    return render_template('players.html', players=players)
+    try:
+        # MongoDB'den aktif oyuncuları al
+        players_list = Player.get_all_active()
+        
+        # Her oyuncu için overall değerini hesapla
+        for player in players_list:
+            stats = player.get('stats', {})
+            weights = {
+                'Kaleci': {'pace': 0.1, 'shooting': 0, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.4, 'physical': 0.2},
+                'Defans': {'pace': 0.2, 'shooting': 0.1, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.3, 'physical': 0.1},
+                'Orta Saha': {'pace': 0.15, 'shooting': 0.2, 'passing': 0.25, 'dribbling': 0.2, 'defending': 0.1, 'physical': 0.1},
+                'Forvet': {'pace': 0.2, 'shooting': 0.3, 'passing': 0.15, 'dribbling': 0.2, 'defending': 0.05, 'physical': 0.1}
+            }
+            
+            w = weights.get(player.get('position', 'Orta Saha'))
+            player['overall'] = int(
+                stats.get('pace', 70) * w['pace'] +
+                stats.get('shooting', 70) * w['shooting'] +
+                stats.get('passing', 70) * w['passing'] +
+                stats.get('dribbling', 70) * w['dribbling'] +
+                stats.get('defending', 70) * w['defending'] +
+                stats.get('physical', 70) * w['physical']
+            )
+            
+            # Stats değerlerini direkt olarak player objesine ekle
+            player['stats'] = {
+                'pace': stats.get('pace', 70),
+                'shooting': stats.get('shooting', 70),
+                'passing': stats.get('passing', 70),
+                'dribbling': stats.get('dribbling', 70),
+                'defending': stats.get('defending', 70),
+                'physical': stats.get('physical', 70)
+            }
+            
+        return render_template('players.html', players=players_list)
+    except Exception as e:
+        flash(str(e), 'error')
+        return redirect(url_for('index'))
 
 @app.route('/matches')
 def matches():
-    matches = Match.query.order_by(Match.date.desc()).all()
-    all_players = Player.query.filter_by(is_active=True).all()
+    matches = Match.get_all()
+    all_players = Player.get_all_active()
     return render_template('matches.html', 
                          matches=matches, 
                          all_players=all_players,
@@ -345,114 +451,182 @@ def get_player_api(id):
 @app.route('/api/matches/<int:id>/teams', methods=['POST'])
 @admin_required
 def update_match_teams(id):
-    match = Match.query.get_or_404(id)
-    data = request.json
-    
-    # Mevcut oyuncuları temizle
-    MatchPlayer.query.filter_by(match_id=id).delete()
-    
-    # A Takımı oyuncularını ekle
-    for player_id in data.get('team_a', []):
-        mp = MatchPlayer(
-            match_id=id,
-            player_id=player_id,
-            team='A',
-            payment_amount=match.total_cost / (len(data.get('team_a', [])) + len(data.get('team_b', [])))
-        )
-        db.session.add(mp)
-    
-    # B Takımı oyuncularını ekle
-    for player_id in data.get('team_b', []):
-        mp = MatchPlayer(
-            match_id=id,
-            player_id=player_id,
-            team='B',
-            payment_amount=match.total_cost / (len(data.get('team_a', [])) + len(data.get('team_b', [])))
-        )
-        db.session.add(mp)
-    
-    db.session.commit()
-    return jsonify({"msg": "Takımlar başarıyla güncellendi"})
-
-@app.template_filter('get_player_card_class')
-def get_player_card_class(ovr):
-    if ovr >= 85:
-        return 'player-special'
-    elif ovr >= 80:
-        return 'player-gold'
-    elif ovr >= 75:
-        return 'player-silver'
-    else:
-        return 'player-bronze'
-
-# Alternatif olarak context processor olarak da ekleyebiliriz
-@app.context_processor
-def utility_processor():
-    def get_player_card_class(ovr):
-        if ovr >= 85:
-            return 'player-special'
-        elif ovr >= 80:
-            return 'player-gold'
-        elif ovr >= 75:
-            return 'player-silver'
-        else:
-            return 'player-bronze'
-    return dict(get_player_card_class=get_player_card_class)
+    try:
+        match = Match.get_by_id(id)
+        if not match:
+            return jsonify({"success": False, "message": "Maç bulunamadı"}), 404
+            
+        data = request.json
+        
+        # Takımları güncelle
+        match['teams'] = {
+            "a": [{
+                "player_id": p,
+                "has_paid": False,
+                "payment_amount": float(match['total_cost']) / (len(data.get('team_a', [])) + len(data.get('team_b', [])))
+            } for p in data.get('team_a', [])],
+            "b": [{
+                "player_id": p,
+                "has_paid": False,
+                "payment_amount": float(match['total_cost']) / (len(data.get('team_a', [])) + len(data.get('team_b', [])))
+            } for p in data.get('team_b', [])]
+        }
+        
+        # MongoDB'de güncelle
+        Match.update(id, {"teams": match['teams']})
+        
+        return jsonify({"success": True, "message": "Takımlar başarıyla güncellendi"})
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
 
 @app.route('/api/matches/<int:match_id>/players/<int:player_id>/payment', methods=['POST'])
 @admin_required
 def toggle_payment_status(match_id, player_id):
     try:
-        match_player = MatchPlayer.query.filter_by(
-            match_id=match_id,
-            player_id=player_id
-        ).first_or_404()
-        
-        match_player.has_paid = not match_player.has_paid
-        db.session.commit()
+        match = Match.get_by_id(match_id)
+        if not match:
+            return jsonify({"success": False, "message": "Maç bulunamadı"}), 404
+            
+        # Oyuncuyu bul ve ödeme durumunu güncelle
+        updated = False
+        for team in ['a', 'b']:
+            for player in match['teams'][team]:
+                if player['player_id'] == str(player_id):
+                    player['has_paid'] = not player['has_paid']
+                    updated = True
+                    break
+            if updated:
+                break
+                
+        if not updated:
+            return jsonify({"success": False, "message": "Oyuncu bulunamadı"}), 404
+            
+        # MongoDB'de güncelle
+        Match.update(match_id, {"teams": match['teams']})
         
         return jsonify({
             "success": True,
             "message": "Ödeme durumu güncellendi",
-            "has_paid": match_player.has_paid
+            "has_paid": player['has_paid']
         })
+        
     except Exception as e:
-        db.session.rollback()
         return jsonify({
             "success": False,
-            "message": "Bir hata oluştu: " + str(e)
+            "message": str(e)
         }), 500
 
-@app.route('/matches/<int:id>')
-def match_detail(id):
-    match = Match.query.get_or_404(id)
+@app.route('/players/<id>')
+def player_profile(id):
+    player = Player.get_by_id(id)
+    if not player:
+        flash('Oyuncu bulunamadı', 'error')
+        return redirect(url_for('players'))
+    
+    # İstatistikleri hesapla
+    stats = Player.get_stats(id)
+    
+    # Beğeni ve yorum istatistiklerini hesapla
+    reactions = Player.get_reactions(id)
+    total_reactions = reactions['likes'] + reactions['dislikes']
+    
+    like_percent = (reactions['likes'] / total_reactions * 100) if total_reactions > 0 else 0
+    dislike_percent = (reactions['dislikes'] / total_reactions * 100) if total_reactions > 0 else 0
     
     # Admin kontrolü
     is_admin = False
-    token = request.cookies.get('jwt_token') or request.headers.get('Authorization', '').replace('Bearer ', '')
-    
+    token = request.cookies.get('jwt_token')
     if token:
         try:
             jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
             is_admin = True
         except:
-            is_admin = False
-    
-    return render_template('match_detail.html', 
-                         match=match,
-                         is_admin=is_admin,  # Template'e admin durumunu gönder
-                         now=datetime.now())
+            pass
 
-@app.route('/new-match')
+    return render_template('player_profile.html',
+                         player=player,
+                         stats=stats,
+                         like_count=reactions['likes'],
+                         dislike_count=reactions['dislikes'],
+                         like_percent=like_percent,
+                         dislike_percent=dislike_percent,
+                         current_user_reaction=reactions.get('current_user_reaction'),
+                         comments=Player.get_comments(id),
+                         is_admin=is_admin)
+
+@app.route('/new-match', methods=['GET'])
 @admin_required
 def new_match():
-    all_players = Player.query.filter_by(is_active=True).all()
-    now = datetime.now()
-    # Dakikayı 30'un katlarına yuvarlama
-    if now.minute % 30:
-        now = now + timedelta(minutes=30 - now.minute % 30)
-    now = now.replace(second=0, microsecond=0)
-    return render_template('new_match.html', all_players=all_players, now=now)
+    try:
+        # MongoDB'den aktif oyuncuları al ve overall değerlerini hesapla
+        all_players = Player.get_all_active()
+        
+        # Her oyuncu için overall değerini hesapla
+        for player in all_players:
+            stats = player.get('stats', {})
+            weights = {
+                'Kaleci': {'pace': 0.1, 'shooting': 0, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.4, 'physical': 0.2},
+                'Defans': {'pace': 0.2, 'shooting': 0.1, 'passing': 0.2, 'dribbling': 0.1, 'defending': 0.3, 'physical': 0.1},
+                'Orta Saha': {'pace': 0.15, 'shooting': 0.2, 'passing': 0.25, 'dribbling': 0.2, 'defending': 0.1, 'physical': 0.1},
+                'Forvet': {'pace': 0.2, 'shooting': 0.3, 'passing': 0.15, 'dribbling': 0.2, 'defending': 0.05, 'physical': 0.1}
+            }
+            
+            w = weights.get(player.get('position', 'Orta Saha'))
+            player['overall'] = int(
+                stats.get('pace', 70) * w['pace'] +
+                stats.get('shooting', 70) * w['shooting'] +
+                stats.get('passing', 70) * w['passing'] +
+                stats.get('dribbling', 70) * w['dribbling'] +
+                stats.get('defending', 70) * w['defending'] +
+                stats.get('physical', 70) * w['physical']
+            )
+        
+        now = datetime.now()
+        return render_template('new_match.html', 
+                             players=all_players,
+                             now=now)
+    except Exception as e:
+        flash(str(e), 'error')
+        return redirect(url_for('matches'))
+
+@app.route('/api/matches', methods=['POST'])
+@admin_required
+def create_match():
+    try:
+        data = request.json
+        
+        # Yeni maç oluştur
+        match_data = {
+            "date": datetime.strptime(data['date'], '%Y-%m-%dT%H:%M'),
+            "location": data['location'],
+            "total_cost": float(data['total_cost']),
+            "teams": {
+                "a": [{"player_id": p, "has_paid": False, "payment_amount": float(data['total_cost']) / (len(data['team_a']) + len(data['team_b']))} for p in data['team_a']],
+                "b": [{"player_id": p, "has_paid": False, "payment_amount": float(data['total_cost']) / (len(data['team_a']) + len(data['team_b']))} for p in data['team_b']]
+            },
+            "score": {
+                "team_a": None,
+                "team_b": None
+            }
+        }
+        
+        # MongoDB'ye kaydet
+        match_id = Match.create(match_data)
+        
+        return jsonify({
+            "success": True,
+            "match_id": str(match_id)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 @app.route('/set-language/<lang>')
 def set_language(lang):
@@ -472,114 +646,6 @@ def inject_language():
         }
     }
 
-@app.route('/player/<int:id>')
-def player_profile(id):
-    player = Player.query.get_or_404(id)
-    
-    # Oyuncunun maç istatistiklerini hesapla
-    match_players = MatchPlayer.query.filter_by(player_id=id).all()
-    total_matches = len(match_players)
-    wins = 0
-    draws = 0
-    match_history = []
-    
-    for mp in match_players:
-        match = Match.query.get(mp.match_id)
-        is_winner = False
-        is_draw = False
-        
-        if match.score_team_a is not None and match.score_team_b is not None:
-            if match.score_team_a == match.score_team_b:
-                is_draw = True
-                draws += 1
-            else:
-                if mp.team == 'A':
-                    is_winner = match.score_team_a > match.score_team_b
-                else:
-                    is_winner = match.score_team_b > match.score_team_a
-                
-                if is_winner:
-                    wins += 1
-        
-        match_history.append({
-            'match_id': match.id,
-            'date': match.date,
-            'location': match.location,
-            'score_team_a': match.score_team_a,
-            'score_team_b': match.score_team_b,
-            'is_winner': is_winner,
-            'is_draw': is_draw,
-            'has_paid': mp.has_paid,
-            'payment_amount': mp.payment_amount
-        })
-    
-    # İstatistikleri hesapla
-    stats = {
-        'total_matches': total_matches,
-        'wins': wins,
-        'draws': draws,
-        'losses': total_matches - wins - draws,
-        'win_rate': (wins / total_matches * 100) if total_matches > 0 else 0
-    }
-    
-    # Ödeme istatistiklerini hesapla
-    payment_stats = {
-        'total_debt': sum(mp.payment_amount for mp in match_players),
-        'total_paid': sum(mp.payment_amount for mp in match_players if mp.has_paid),
-        'remaining': sum(mp.payment_amount for mp in match_players if not mp.has_paid)
-    }
-    
-    # Grafik verilerini hazırla
-    chart_data = {
-        'labels': [],
-        'win_rates': []
-    }
-    
-    win_count = 0
-    for i, mp in enumerate(match_players, 1):
-        match = Match.query.get(mp.match_id)
-        if match.score_team_a is not None and match.score_team_b is not None:
-            if mp.team == 'A':
-                if match.score_team_a > match.score_team_b:
-                    win_count += 1
-            else:
-                if match.score_team_b > match.score_team_a:
-                    win_count += 1
-                    
-            chart_data['labels'].append(match.date.strftime('%d/%m'))
-            chart_data['win_rates'].append(round(win_count / i * 100, 1))
-    
-    # Admin kontrolü
-    is_admin = False
-    admin_token = request.cookies.get('jwt_token')
-    if admin_token:
-        try:
-            jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            is_admin = True
-        except:
-            pass
-
-    # Oyuncu girişi kontrolü
-    is_logged_in = 'player_id' in session
-    
-    # Giriş yapmış kullanıcı bu oyuncuyu beğenmiş mi?
-    has_liked = False
-    if 'player_id' in session:
-        has_liked = PlayerLike.query.filter_by(
-            player_id=id,
-            liker_id=session['player_id']
-        ).first() is not None
-    
-    return render_template('player_profile.html',
-                         player=player,
-                         stats=stats,
-                         match_history=match_history,
-                         payment_stats=payment_stats,
-                         chart_data=chart_data,
-                         is_admin=is_admin,
-                         is_logged_in=is_logged_in,
-                         has_liked=has_liked)
-
 def format_date(date, lang='tr'):
     if lang == 'tr':
         return date.strftime('%d/%m/%Y %H:%M')
@@ -593,20 +659,26 @@ def format_date_filter(date):
 @admin_required
 def mark_all_paid(match_id):
     try:
-        # Maça ait tüm oyuncuların ödeme durumunu güncelle
-        match_players = MatchPlayer.query.filter_by(match_id=match_id).all()
-        
-        for mp in match_players:
-            mp.has_paid = True
-        
-        db.session.commit()
+        match = Match.get_by_id(str(match_id))
+        if not match:
+            return jsonify({
+                "success": False,
+                "message": get_translation('match_not_found')
+            }), 404
+
+        # Her iki takımdaki tüm oyuncuları ödenmiş olarak işaretle
+        for team in ['a', 'b']:
+            for player in match['teams'][team]:
+                player['has_paid'] = True
+
+        # Maçı güncelle
+        Match.update(str(match_id), {"teams": match['teams']})
         
         return jsonify({
             "success": True,
             "message": get_translation('all_payments_completed')
         })
     except Exception as e:
-        db.session.rollback()
         return jsonify({
             "success": False,
             "message": f"{get_translation('error')}: {str(e)}"
@@ -623,28 +695,33 @@ def serve_sound(filename):
 
 @app.route('/player-login', methods=['GET', 'POST'])
 def player_login():
+    # Admin girişi yapılmışsa oyuncu girişine izin verme
+    admin_token = request.cookies.get('jwt_token')
+    if admin_token:
+        try:
+            jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
+            flash(get_translation('admin_already_logged_in'), 'warning')
+            return redirect(url_for('index'))
+        except:
+            pass
+    
     if request.method == 'POST':
         tc_no = request.form.get('tc_no')
-        player = Player.query.filter_by(tc_no=tc_no).first()
+        player = Player.get_by_tc(tc_no)
         
         if player:
-            # JWT token oluştur
             token = jwt.encode({
-                'player_id': player.id,
-                'exp': datetime.utcnow() + timedelta(days=30)  # 30 gün geçerli
+                'player_id': player['_id'],
+                'exp': datetime.utcnow() + timedelta(hours=24)
             }, app.config['SECRET_KEY'])
             
-            # Session'a player_id'yi kaydet
-            session['player_id'] = player.id
+            session['player_id'] = player['_id']
             
-            # Response oluştur ve cookie ekle
-            response = make_response(redirect(url_for('player_profile', id=player.id)))
+            response = make_response(redirect(url_for('index')))
             response.set_cookie('player_jwt', token, httponly=True, secure=True)
-            
             return response
         else:
             flash(get_translation('invalid_tc'), 'error')
-            return redirect(url_for('player_login'))
     
     return render_template('player_login.html')
 
@@ -768,6 +845,91 @@ def toggle_reaction(player_id):
             "success": False,
             "error": str(e)
         }), 500
+
+@app.route('/admin-logout')
+def admin_logout():
+    response = make_response(redirect(url_for('index')))
+    response.delete_cookie('jwt_token')
+    return response
+
+@app.route('/api/matches/<id>/score', methods=['POST'])
+@admin_required
+def update_match_score(id):
+    try:
+        data = request.json
+        match = Match.get_by_id(id)
+        
+        if not match:
+            return jsonify({"success": False, "message": "Maç bulunamadı"}), 404
+            
+        match['score'] = {
+            'team_a': data['team_a'],
+            'team_b': data['team_b']
+        }
+        
+        Match.update(id, {"score": match['score']})
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/matches/<id>/payment', methods=['POST'])
+@admin_required
+def update_player_payment(id):
+    try:
+        data = request.json
+        match = Match.get_by_id(id)
+        
+        if not match:
+            return jsonify({"success": False, "message": "Maç bulunamadı"}), 404
+            
+        player_id = data['player_id']
+        has_paid = data['has_paid']
+        
+        # Oyuncuyu bul ve ödeme durumunu güncelle
+        for team in ['a', 'b']:
+            for player in match['teams'][team]:
+                if player['player_id'] == player_id:
+                    player['has_paid'] = has_paid
+                    break
+                    
+        Match.update(id, {"teams": match['teams']})
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/matches/<id>/team-payment', methods=['POST'])
+@admin_required
+def update_team_payments(id):
+    try:
+        data = request.json
+        match = Match.get_by_id(id)
+        
+        if not match:
+            return jsonify({"success": False, "message": "Maç bulunamadı"}), 404
+            
+        team = data.get('team')
+        has_paid = data.get('has_paid')
+        
+        # Tüm takım oyuncularının ödeme durumunu güncelle
+        for player in match['teams'][team]:
+            player['has_paid'] = has_paid
+            
+        Match.update(id, {"teams": match['teams']})
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/matches/<id>')
+def match_detail(id):
+    match = Match.get_by_id(id)
+    if not match:
+        flash('Maç bulunamadı', 'error')
+        return redirect(url_for('matches'))
+        
+    return render_template('match_detail.html', match=match)
 
 if __name__ == '__main__':
     app.run(debug=True) 
