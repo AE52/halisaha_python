@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory, make_response
 from models import Player, Match, API_KEY  # MatchPlayer ve diğer modelleri kaldır
 from config import Config
@@ -28,6 +28,7 @@ db = client[Config.MONGO_DB]
 matches = db.matches
 players = db.players
 reactions = db.reactions  # Reaksiyonlar için koleksiyon
+comments = db.comments  # Yorum koleksiyonunu ekle
 
 # Bağlantıyı test et
 try:
@@ -539,30 +540,25 @@ def player_profile(id):
         like_percent = (reactions['likes'] / total_reactions * 100) if total_reactions > 0 else 0
         dislike_percent = (reactions['dislikes'] / total_reactions * 100) if total_reactions > 0 else 0
 
-        # Oyuncunun maç istatistiklerini al
-        match_stats = player.get('match_stats', {
-            'total_matches': 0,
-            'wins': 0,
-            'draws': 0,
-            'losses': 0,
-            'win_rate': 0,
-            'match_history': [],
-            'payment_stats': {
-                'total_debt': "0.00",
-                'total_paid': "0.00",
-                'remaining': "0.00"
-            }
-        })
+        # Mevcut kullanıcının beğeni durumunu kontrol et
+        current_user_reaction = None
+        if 'player_id' in session:
+            current_user_reaction = Player.get_user_reaction(id, session['player_id'])
+
+        # Yorumları al
+        comments = list(db.comments.find({"player_id": id}).sort("created_at", -1))
 
         return render_template('player_profile.html',
                              player=player,
-                             stats=match_stats,
+                             stats=player.get('match_stats', {}),
                              like_count=reactions['likes'],
                              dislike_count=reactions['dislikes'],
                              like_percent=like_percent,
-                             dislike_percent=dislike_percent)
+                             dislike_percent=dislike_percent,
+                             current_user_reaction=current_user_reaction,
+                             comments=comments)
     except Exception as e:
-        print(f"Oyuncu profili hatası: {str(e)}")  # Hata logla
+        print(f"Oyuncu profili hatası: {str(e)}")
         return render_template('404.html',
                              error_message="Oyuncu profili görüntülenirken bir hata oluştu",
                              error_details=str(e)), 404
@@ -742,54 +738,38 @@ def player_logout():
     flash('Başarıyla çıkış yaptınız', 'success')
     return response
 
-@app.route('/api/comments/<int:player_id>', methods=['POST'])
-def add_comment(player_id):
-    # Admin kontrolü
-    is_admin = False
-    admin_token = request.cookies.get('jwt_token')
-    if admin_token:
-        try:
-            jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            is_admin = True
-        except:
-            pass
-
-    # Normal oyuncu kontrolü
-    if not is_admin and 'player_id' not in session:
-        return jsonify({"error": get_translation('login_required_for_comment')}), 401
-    
+@app.route('/api/players/<id>/comments', methods=['POST'])
+def add_comment(id):
     try:
-        # Yorum yapan kişinin ID'si (admin veya oyuncu)
-        commenter_id = None
-        if is_admin:
-            commenter_id = -1  # Admin için özel ID
-        else:
-            commenter_id = session['player_id']
+        if not session.get('player_id'):
+            return jsonify({"error": "Yorum yapmak için giriş yapmalısınız"}), 401
+
+        data = request.json
+        comment_text = data.get('text')
         
-        comment_text = request.json.get('comment')
         if not comment_text:
             return jsonify({"error": "Yorum boş olamaz"}), 400
+
+        # Yorumu ekle
+        comment = {
+            "_id": str(ObjectId()),
+            "player_id": id,
+            "commenter_id": session['player_id'],
+            "commenter_name": Player.get_by_id(session['player_id'])['name'],
+            "text": comment_text,
+            "created_at": datetime.now(timezone.utc),
+            "is_admin": False
+        }
         
-        comment = PlayerComment(
-            player_id=player_id,
-            commenter_id=commenter_id,
-            comment=comment_text,
-            is_admin_comment=is_admin
-        )
-        db.session.add(comment)
-        db.session.commit()
+        db.comments.insert_one(comment)
         
-        return jsonify({
-            "success": True,
-            "message": "Yorum başarıyla eklendi"
-        })
+        # Yanıt için tarihi formatlı string'e çevir
+        comment['created_at'] = comment['created_at'].strftime('%d/%m/%Y %H:%M')
         
+        return jsonify(comment)
+
     except Exception as e:
-        db.session.rollback()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/likes/<int:player_id>', methods=['POST'])
 def toggle_reaction(player_id):
@@ -1075,37 +1055,14 @@ def inject_user():
 @app.route('/api/players/<id>/reaction', methods=['POST'])
 def add_reaction(id):
     try:
+        if not session.get('player_id'):
+            return jsonify({"error": "Beğeni/beğenmeme için giriş yapmalısınız"}), 401
+
         data = request.json
         is_like = data.get('is_like')
         
-        # Admin kontrolü
-        is_admin = False
-        admin_token = request.cookies.get('jwt_token')
-        if admin_token:
-            try:
-                jwt.decode(admin_token, app.config['SECRET_KEY'], algorithms=["HS256"])
-                is_admin = True
-            except:
-                pass
-
-        # Oyuncu kontrolü
-        player_token = request.cookies.get('player_token')
-        if not is_admin and not player_token:
-            return jsonify({"error": "Beğeni/beğenmeme için giriş yapmalısınız"}), 401
-
-        # Kullanıcı ID'sini belirle
-        user_id = None
-        if is_admin:
-            user_id = "admin"
-        else:
-            try:
-                data = jwt.decode(player_token, app.config['SECRET_KEY'], algorithms=["HS256"])
-                user_id = data.get('player_id')
-            except:
-                return jsonify({"error": "Geçersiz oturum"}), 401
-
         # Reaksiyonu ekle/güncelle
-        success = Player.add_or_update_reaction(id, user_id, is_like, is_admin)
+        success = Player.add_or_update_reaction(id, session['player_id'], is_like)
         
         if success:
             # Güncel beğeni sayılarını döndür
