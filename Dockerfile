@@ -13,8 +13,6 @@ ENV SECRET_KEY="gizli-anahtar-123"
 # Sistem bağımlılıklarını yükle
 RUN apt-get update && apt-get install -y \
     curl \
-    python3-dev \
-    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Python bağımlılıklarını kopyala ve yükle
@@ -29,9 +27,8 @@ RUN useradd -m appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-# Health check tanımla
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/health || exit 1
+# Port'u belirt
+EXPOSE ${PORT}
 
 # Uygulamayı başlat
 CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 app:app 
