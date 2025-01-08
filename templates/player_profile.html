@@ -1924,5 +1924,159 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Beğeni sistemi
+async function react(type) {
+    try {
+        const response = await fetch(`/api/players/{{ player._id }}/react`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ reaction_type: type })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            if (response.status === 403) {
+                alert('Beğeni/beğenmeme için giriş yapmalısınız!');
+                return;
+            }
+            throw new Error(errorData.error || 'İşlem başarısız');
+        }
+
+        const data = await response.json();
+        console.log("Beğeni yanıtı:", data);
+
+        // Beğeni sayılarını güncelle
+        document.getElementById('likes-count').textContent = data.likes;
+        document.getElementById('dislikes-count').textContent = data.dislikes;
+
+        // Progress circle'ı güncelle
+        const total = data.likes + data.dislikes;
+        const likePercent = total > 0 ? (data.likes / total * 100) : 0;
+        const dislikePercent = total > 0 ? (data.dislikes / total * 100) : 0;
+
+        // SVG path'leri güncelle
+        document.querySelector('.circle-like').setAttribute('stroke-dasharray', `${likePercent}, 100`);
+        document.querySelector('.circle-dislike').setAttribute('stroke-dasharray', `${dislikePercent}, 100`);
+        document.querySelector('.circle-dislike').setAttribute('transform', `rotate(${likePercent * 3.6} 18 18)`);
+
+        // Yüzde metinlerini güncelle
+        document.querySelector('.like-percent').textContent = `%${likePercent.toFixed(1)}`;
+        document.querySelector('.dislike-percent').textContent = `%${dislikePercent.toFixed(1)}`;
+
+        // Butonların aktif durumunu güncelle
+        document.querySelectorAll('.btn-reaction').forEach(btn => btn.classList.remove('active'));
+        if (data.current_user_reaction === type) {
+            document.querySelector(`.btn-reaction:nth-child(${type === 'like' ? 1 : 2})`).classList.add('active');
+        }
+
+    } catch (error) {
+        console.error('Beğeni hatası:', error);
+        alert('Bir hata oluştu: ' + error.message);
+    }
+}
+
+// Yorum gönderme fonksiyonu
+async function submitComment(event) {
+    event.preventDefault();
+    
+    try {
+        const commentText = document.getElementById('commentText').value.trim();
+        if (!commentText) {
+            alert('Lütfen bir yorum yazın!');
+            return;
+        }
+
+        const response = await fetch(`/api/players/{{ player._id }}/comments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ text: commentText })
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Yorum gönderilemedi');
+        }
+
+        const data = await response.json();
+        
+        // Yeni yorumu listeye ekle
+        const commentsList = document.getElementById('commentsList');
+        const newComment = `
+            <div class="comment-item ${data.is_admin ? 'admin-comment' : ''}" data-id="${data._id}">
+                <div class="comment-header">
+                    <div class="commenter-info">
+                        <div class="commenter-avatar">
+                            <img src="${data.commenter_avatar || '/static/img/default-avatar.png'}" 
+                                 alt="${data.commenter_name}"
+                                 onerror="this.src='https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'">
+                        </div>
+                        <div class="commenter-details">
+                            <div class="commenter-name">
+                                ${data.is_admin ? '<i class="fas fa-shield-alt admin-badge" title="Admin"></i>' : ''}
+                                ${data.commenter_name}
+                            </div>
+                            <div class="comment-date">
+                                ${new Date().toLocaleString('tr-TR')}
+                            </div>
+                        </div>
+                    </div>
+                    ${data.is_admin ? `
+                        <div class="comment-actions">
+                            <button class="btn btn-sm btn-danger" onclick="deleteComment('${data._id}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="comment-content">${data.text}</div>
+            </div>
+        `;
+        commentsList.insertAdjacentHTML('afterbegin', newComment);
+        
+        // Formu temizle
+        document.getElementById('commentText').value = '';
+
+    } catch (error) {
+        console.error('Yorum gönderme hatası:', error);
+        alert('Yorum gönderilirken bir hata oluştu: ' + error.message);
+    }
+}
+
+// Yorum silme fonksiyonu
+async function deleteComment(commentId) {
+    if (!confirm('Bu yorumu silmek istediğinizden emin misiniz?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/players/{{ player._id }}/comments/${commentId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Yorum silinemedi');
+        }
+
+        // Yorumu DOM'dan kaldır
+        const commentElement = document.querySelector(`.comment-item[data-id="${commentId}"]`);
+        if (commentElement) {
+            commentElement.remove();
+        }
+
+    } catch (error) {
+        console.error('Yorum silme hatası:', error);
+        alert('Yorum silinirken bir hata oluştu: ' + error.message);
+    }
+}
 </script>
 {% endblock %} 
